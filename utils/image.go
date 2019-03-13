@@ -1,4 +1,4 @@
-package handauth
+package utils
 
 import (
 	"fmt"
@@ -15,6 +15,33 @@ type Image struct {
 	ratio  float64
 }
 
+func NewImage(filename string) *Image {
+	im := Image{
+		mat:    gocv.NewMat(),
+		height: 0,
+		width:  0,
+		ratio:  0.0,
+	}
+	im.read(filename)
+	return &im
+}
+
+func (im *Image) Mat() gocv.Mat {
+	return im.mat
+}
+
+func (im *Image) Height() int {
+	return im.height
+}
+
+func (im *Image) Width() int {
+	return im.width
+}
+
+func (im *Image) Ratio() float64 {
+	return im.ratio
+}
+
 func (im *Image) read(name string) {
 	mat := gocv.IMRead(name, gocv.IMReadGrayScale)
 	im.mat = mat
@@ -25,7 +52,7 @@ func (im *Image) read(name string) {
 	im.update()
 }
 
-func (im *Image) preprocess() {
+func (im *Image) Preprocess() {
 	im.normalize()
 	im.foreground()
 	im.crop()
@@ -89,44 +116,4 @@ func (im *Image) resize(width int) {
 	gocv.Resize(im.mat, &dst, point, 0.0, 0.0, gocv.InterpolationNearestNeighbor)
 
 	im.mat = dst
-}
-
-type Signature struct {
-	user  string
-	image Image
-}
-
-func (s *Signature) Image() Image {
-	return s.image
-}
-
-func NewSignature(username, filename string) Signature {
-	im := Image{
-		mat:    gocv.NewMat(),
-		height: 0,
-		width:  0,
-		ratio:  0.0,
-	}
-	im.read(filename)
-	s := Signature{
-		user:  username,
-		image: im,
-	}
-	return s
-}
-
-func (s *Signature) Preprocess() {
-	s.image.preprocess()
-}
-
-func (s *Signature) Show() {
-	window := gocv.NewWindow(fmt.Sprintf("%s's signature (%dx%d)", s.user, s.image.width, s.image.height))
-	defer window.Close()
-	window.ResizeWindow(s.image.width, s.image.height)
-	window.IMShow(s.image.mat)
-	for window.IsOpen() {
-		if window.WaitKey(1) > 0 {
-			break
-		}
-	}
 }
