@@ -2,21 +2,20 @@ package auth
 
 import (
 	"fmt"
-	"github.com/radekwlsk/handauth/utils"
 	"gocv.io/x/gocv"
 )
 
 type Signature struct {
 	user  string
-	image *utils.Image
+	image *Image
 }
 
-func (s *Signature) Image() *utils.Image {
+func (s *Signature) Image() *Image {
 	return s.image
 }
 
 func NewSignature(username, filename string) Signature {
-	im := utils.NewImage(filename)
+	im := NewImage(filename)
 	s := Signature{
 		user:  username,
 		image: im,

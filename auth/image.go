@@ -1,4 +1,4 @@
-package utils
+package auth
 
 import (
 	"fmt"
@@ -49,7 +49,7 @@ func (im *Image) read(name string) {
 		fmt.Printf("Failed to read image: %s\n", name)
 		os.Exit(1)
 	}
-	im.update()
+	im.Update()
 }
 
 func (im *Image) Preprocess() {
@@ -59,14 +59,14 @@ func (im *Image) Preprocess() {
 	im.resize(400)
 }
 
-func (im *Image) update() {
+func (im *Image) Update() {
 	im.height = im.mat.Rows()
 	im.width = im.mat.Cols()
 	im.ratio = float64(im.width) / float64(im.height)
 }
 
 func (im *Image) normalize() {
-	defer im.update()
+	defer im.Update()
 	dst := gocv.NewMat()
 
 	gocv.BilateralFilter(im.mat, &dst, 5, 75, 75)
@@ -83,7 +83,7 @@ func (im *Image) normalize() {
 }
 
 func (im *Image) foreground() {
-	defer im.update()
+	defer im.Update()
 	dst := gocv.NewMat()
 
 	gocv.Threshold(im.mat, &dst, 0.0, 255.0, gocv.ThresholdBinaryInv+gocv.ThresholdOtsu)
@@ -92,7 +92,7 @@ func (im *Image) foreground() {
 }
 
 func (im *Image) crop() {
-	defer im.update()
+	defer im.Update()
 	dst := gocv.NewMat()
 
 	contours := gocv.FindContours(im.mat, gocv.RetrievalExternal, gocv.ChainApproxSimple)
@@ -106,7 +106,7 @@ func (im *Image) crop() {
 }
 
 func (im *Image) resize(width int) {
-	defer im.update()
+	defer im.Update()
 	dst := gocv.NewMat()
 
 	point := image.Point{

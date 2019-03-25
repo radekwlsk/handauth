@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"github.com/radekwlsk/handauth/features"
 	"time"
 )
 
@@ -10,9 +9,9 @@ type Template struct {
 	updateTime        time.Time
 	width             int
 	nSamples          int
-	features          map[features.FeatureType]features.Features
-	featuresEnabled   map[features.FeatureType]bool
-	featuresAvailable map[features.FeatureType]bool
+	features          map[FeatureType]Features
+	featuresEnabled   map[FeatureType]bool
+	featuresAvailable map[FeatureType]bool
 }
 
 func NewTemplate(user string, width int) *Template {
@@ -21,7 +20,7 @@ func NewTemplate(user string, width int) *Template {
 		updateTime: time.Now(),
 		width:      width,
 		nSamples:   0,
-		features:   map[features.FeatureType]features.Features{},
+		features:   map[FeatureType]Features{},
 	}
 	return &t
 }
