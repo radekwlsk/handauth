@@ -1,9 +1,11 @@
 package auth
 
 import (
+	"fmt"
 	"gocv.io/x/gocv"
 	"gonum.org/v1/gonum/stat"
 	"math"
+	"sync"
 )
 
 type FeatureType string
@@ -15,16 +17,42 @@ const (
 )
 
 type Feature struct {
-	Std    float64
-	Mean   float64
-	Values []float64
+	Name     string
+	Std      float64
+	Mean     float64
+	Var      float64
+	Max      float64
+	Min      float64
+	Function func(sample *Image) float64
 }
 
-func NewFeature() *Feature {
-	return &Feature{
-		Std:    0.0,
-		Mean:   0.0,
-		Values: nil,
+func (f *Feature) String() string {
+	return fmt.Sprintf("%s: [%.3f, %.3f], ~%.3f, var %.3f(%.3f)", f.Name, f.Min, f.Max, f.Mean, f.Var, f.Std)
+}
+
+func (f *Feature) Update(sample *Image, nSamples int) {
+	value := f.Function(sample)
+	if nSamples == 1 {
+		f.Mean = value
+		f.Min = value
+		f.Max = value
+		f.Var = 0.0
+		f.Std = 0.0
+	} else {
+		newMean := stat.Mean([]float64{f.Mean, value}, []float64{float64(nSamples - 1), 1})
+		newVar := f.Var + (math.Pow(value-f.Mean, 2) / float64(nSamples))
+		newVar *= float64(nSamples-1) / float64(nSamples)
+
+		f.Mean = newMean
+		f.Var = newVar
+		f.Std = math.Sqrt(newVar)
+
+		if value > f.Max {
+			f.Max = value
+		}
+		if value < f.Min {
+			f.Min = value
+		}
 	}
 }
 
@@ -37,59 +65,65 @@ type BasicFeatures map[string]*Feature
 
 func NewBasicFeatures() *BasicFeatures {
 	return &BasicFeatures{
-		"aspect":   NewFeature(),
-		"length":   NewFeature(),
-		"gradient": NewFeature(),
+		"aspect": &Feature{
+			Name: "aspect",
+			Function: func(sample *Image) float64 {
+				return sample.Ratio()
+			},
+		},
+		"length": &Feature{
+			Name: "length",
+			Function: func(sample *Image) float64 {
+				return float64(gocv.CountNonZero(sample.Mat()))
+			},
+		},
+		"gradient": &Feature{
+			Name: "gradient",
+			Function: func(sample *Image) float64 {
+				sobelX := gocv.NewMat()
+				sobelY := gocv.NewMat()
+				gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)
+				gradX := gocv.CountNonZero(sobelX)
+				gradY := gocv.CountNonZero(sobelY)
+				if gradX != 0 && gradY != 0 {
+					return float64(gradX) / float64(gradX+gradY)
+				} else {
+					return 0.0
+				}
+			},
+		},
 	}
 }
 
-func (f BasicFeatures) Score(filename string) float64 {
-	pattern := *NewBasicFeatures()
+func (f BasicFeatures) Score(filename string) (float64, *BasicFeatures) {
+	pattern := NewBasicFeatures()
 	sample := NewImage(filename)
 	sample.Preprocess()
-	pattern.Extract(*sample, 1)
+	pattern.Extract(sample, 1)
 
 	scores := make([]float64, 0)
 	for key := range f {
 		//fmt.Printf("%s: pattern: %f, mean: %f, std: %f\n", key, pattern[key].Mean, f[key].Mean, f[key].Std)
-		score := stat.StdScore(pattern[key].Mean, f[key].Mean, f[key].Std)
+		score := stat.StdScore((*pattern)[key].Mean, f[key].Mean, f[key].Std)
 		scores = append(scores, score)
 	}
-	return stat.Mean(scores, nil)
+	return stat.Mean(scores, nil), pattern
 }
 
-func (f BasicFeatures) Extract(sample Image, nSamples int) {
+func (f BasicFeatures) Extract(sample *Image, nSamples int) {
 	sample.Update()
-	aspect := sample.Ratio()
 
-	length := float64(gocv.CountNonZero(sample.Mat()))
+	var wg sync.WaitGroup
+	wg.Add(len(f))
 
-	sobelX := gocv.NewMat()
-	sobelY := gocv.NewMat()
-	gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)
-	gradX := gocv.CountNonZero(sobelX)
-	gradY := gocv.CountNonZero(sobelY)
-	gradient := 0.0
-	if gradX != 0 && gradY != 0 {
-		gradient = float64(gradX) / float64(gradX+gradY)
+	for _, feature := range f {
+		go func(f *Feature) {
+			defer wg.Done()
+			f.Update(sample, nSamples)
+		}(feature)
 	}
 
-	if nSamples != 1 {
-		weights := []float64{float64(nSamples - 1), 1}
-
-		values := []float64{f["aspect"].Mean, aspect}
-		f["aspect"].Mean, f["aspect"].Std = stat.MeanStdDev(values, weights)
-
-		values = []float64{f["length"].Mean, length}
-		f["length"].Mean, f["length"].Std = stat.MeanStdDev(values, weights)
-
-		values = []float64{f["gradient"].Mean, gradient}
-		f["gradient"].Mean, f["gradient"].Std = stat.MeanStdDev(values, weights)
-	} else {
-		f["aspect"].Mean = aspect
-		f["length"].Mean = length
-		f["gradient"].Mean = gradient
-	}
+	wg.Wait()
 }
 
 type LengthGridFeatures struct {
