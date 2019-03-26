@@ -105,7 +105,7 @@ func (f BasicFeatures) Score(filename string) (float64, *BasicFeatures) {
 	for key := range f {
 		//fmt.Printf("%s: pattern: %f, mean: %f, std: %f\n", key, pattern[key].Mean, f[key].Mean, f[key].Std)
 		score := stat.StdScore((*pattern)[key].Mean, f[key].Mean, f[key].Std)
-		scores = append(scores, score)
+		scores = append(scores, math.Abs(score))
 	}
 	return stat.Mean(scores, nil), pattern
 }
