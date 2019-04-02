@@ -6,7 +6,16 @@ import (
 	"image"
 	"math"
 	"os"
+	"sync"
 )
+
+const (
+	TargetWidth = 400.0
+	Stride      = 10.0
+	//ColWidth    = 40.0
+)
+
+//var	ColsNum = math.Round((TargetWidth - ColWidth / Stride) + 1)
 
 type Sample struct {
 	mat    gocv.Mat
@@ -56,7 +65,7 @@ func (sample *Sample) Preprocess(ratio float64) {
 	sample.normalize()
 	sample.foreground()
 	sample.crop()
-	sample.resize(400, ratio)
+	sample.Resize(TargetWidth, ratio)
 }
 
 func (sample *Sample) Update() {
@@ -104,7 +113,7 @@ func (sample *Sample) crop() {
 	sample.mat = dst.Clone()
 }
 
-func (sample *Sample) resize(width int, ratio float64) {
+func (sample *Sample) Resize(width int, ratio float64) {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
@@ -149,16 +158,29 @@ type SampleGrid struct {
 	rows        int
 	cols        int
 	fields      [][]*Sample
+	mutex       sync.Mutex
 }
 
-func calcGridDim(width, expectedSize, stride float64) (dim int, size float64) {
-	n := math.Round(((width - expectedSize) / stride) + 1)
-	return int(n), math.Ceil(width - stride*(n-1))
+//func calcGridDim(h, w float64) (rows, cols int) {
+//	rows = int(math.Round(((h - ColWidth) / Stride) + 1))
+//	cols = int(math.Round(((w - ColWidth) / Stride) + 1))
+//	return
+//}
+
+func calcGridSize(h, w float64, r, c int) (height, width float64) {
+	height = math.Ceil(h - Stride*float64(r-1))
+	width = math.Ceil(w - Stride*float64(c-1))
+	if height < 0 {
+		panic("decrease number of rows")
+	}
+	if width < 0 {
+		panic("decrease number of columns")
+	}
+	return
 }
 
-func NewSampleGrid(sample *Sample, size, stride float64) *SampleGrid {
-	rows, height := calcGridDim(float64(sample.height), size, stride)
-	cols, width := calcGridDim(float64(sample.width), size, stride)
+func NewSampleGrid(sample *Sample, rows, cols int) *SampleGrid {
+	height, width := calcGridSize(float64(sample.height), float64(sample.width), rows, cols)
 	fields := make([][]*Sample, rows)
 	for i := range fields {
 		fields[i] = make([]*Sample, cols)
@@ -170,7 +192,7 @@ func NewSampleGrid(sample *Sample, size, stride float64) *SampleGrid {
 		sample:      sample,
 		fieldHeight: int(height),
 		fieldWidth:  int(width),
-		stride:      int(stride),
+		stride:      int(Stride),
 		rows:        rows,
 		cols:        cols,
 		fields:      fields,
@@ -180,14 +202,17 @@ func NewSampleGrid(sample *Sample, size, stride float64) *SampleGrid {
 func (sgrid *SampleGrid) String() string {
 	return fmt.Sprintf(
 		"<SampleGrid %dx%d, (%d, %d), %d>",
-		sgrid.cols,
 		sgrid.rows,
-		sgrid.fieldWidth,
+		sgrid.cols,
 		sgrid.fieldHeight,
-		sgrid.stride)
+		sgrid.fieldWidth,
+		sgrid.stride,
+	)
 }
 
 func (sgrid *SampleGrid) At(row, col int) *Sample {
+	sgrid.mutex.Lock()
+	defer sgrid.mutex.Unlock()
 	if sgrid.fields[row][col] == nil {
 		s := &Sample{
 			mat:    gocv.NewMat(),
@@ -205,6 +230,11 @@ func (sgrid *SampleGrid) At(row, col int) *Sample {
 		if y2 > sgrid.sample.height {
 			y2 = sgrid.sample.height
 		}
+
+		if x2 <= x1 || y2 <= y1 {
+			panic("at the disco")
+		}
+
 		rect := image.Rect(x1, y1, x2, y2)
 		s.mat = sgrid.sample.mat.Region(rect)
 		sgrid.fields[row][col] = s

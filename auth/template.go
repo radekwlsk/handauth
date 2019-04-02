@@ -8,20 +8,28 @@ import (
 type Template struct {
 	user              string
 	updateTime        time.Time
-	width             int
 	nSamples          int
-	features          map[features.FeatureType]features.Features
+	width             int
+	gridStride        float64
+	gridSize          [2]float64
+	features          *features.Features
 	featuresEnabled   map[features.FeatureType]bool
 	featuresAvailable map[features.FeatureType]bool
 }
 
-func NewTemplate(user string, width int) *Template {
+func NewTemplate(
+	user string,
+	width int,
+	gridStride float64,
+	gridSize [2]float64,
+) *Template {
 	t := Template{
 		user:       user,
 		updateTime: time.Now(),
-		width:      width,
 		nSamples:   0,
-		features:   map[features.FeatureType]features.Features{},
+		width:      width,
+		gridStride: gridStride,
+		gridSize:   gridSize,
 	}
 	return &t
 }
