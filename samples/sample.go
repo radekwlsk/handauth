@@ -4,35 +4,45 @@ import (
 	"fmt"
 	"gocv.io/x/gocv"
 	"image"
+	"image/color"
 	"math"
-	"os"
 	"sync"
 )
 
 const (
 	TargetWidth = 400.0
-	Stride      = 10.0
-	//ColWidth    = 40.0
+	Stride      = 20.0
 )
-
-//var	ColsNum = math.Round((TargetWidth - ColWidth / Stride) + 1)
 
 type Sample struct {
 	mat    gocv.Mat
-	height int
-	width  int
+	height uint16
+	width  uint16
 	ratio  float64
 }
 
-func NewSample(filename string) *Sample {
+func NewSample(filename string) (*Sample, error) {
 	s := &Sample{
 		mat:    gocv.NewMat(),
 		height: 0,
 		width:  0,
 		ratio:  0.0,
 	}
-	s.read(filename)
-	return s
+	err := s.read(filename)
+	return s, err
+}
+
+func (sample *Sample) Copy() *Sample {
+	return &Sample{
+		mat:    sample.mat.Clone(),
+		height: sample.height,
+		width:  sample.width,
+		ratio:  sample.ratio,
+	}
+}
+
+func (sample *Sample) MatType() gocv.MatType {
+	return sample.mat.Type()
 }
 
 func (sample *Sample) Mat() gocv.Mat {
@@ -40,25 +50,25 @@ func (sample *Sample) Mat() gocv.Mat {
 }
 
 func (sample *Sample) Height() int {
-	return sample.height
+	return int(sample.height)
 }
 
 func (sample *Sample) Width() int {
-	return sample.width
+	return int(sample.width)
 }
 
 func (sample *Sample) Ratio() float64 {
 	return sample.ratio
 }
 
-func (sample *Sample) read(name string) {
+func (sample *Sample) read(name string) error {
 	mat := gocv.IMRead(name, gocv.IMReadGrayScale)
 	sample.mat = mat
 	if sample.mat.Empty() {
-		fmt.Printf("Failed to read sample: %s\n", name)
-		os.Exit(1)
+		return fmt.Errorf("failed to read sample: %s", name)
 	}
 	sample.Update()
+	return nil
 }
 
 func (sample *Sample) Preprocess(ratio float64) {
@@ -66,11 +76,13 @@ func (sample *Sample) Preprocess(ratio float64) {
 	sample.foreground()
 	sample.crop()
 	sample.Resize(TargetWidth, ratio)
+	sample.zhangSuen()
+	//sample.toLines()
 }
 
 func (sample *Sample) Update() {
-	sample.height = sample.mat.Rows()
-	sample.width = sample.mat.Cols()
+	sample.height = uint16(sample.mat.Rows())
+	sample.width = uint16(sample.mat.Cols())
 	sample.ratio = float64(sample.width) / float64(sample.height)
 }
 
@@ -87,7 +99,10 @@ func (sample *Sample) normalize() {
 		lookup.SetUCharAt(0, i, val)
 	}
 	gocv.LUT(sample.mat, lookup, &dst)
-	sample.mat = dst
+
+	_ = sample.mat.Close()
+	sample.mat = dst.Clone()
+	_ = dst.Close()
 }
 
 func (sample *Sample) foreground() {
@@ -96,7 +111,71 @@ func (sample *Sample) foreground() {
 
 	gocv.Threshold(sample.mat, &dst, 0.0, 255.0, gocv.ThresholdBinaryInv+gocv.ThresholdOtsu)
 
-	sample.mat = dst
+	_ = sample.mat.Close()
+	sample.mat = dst.Clone()
+	_ = dst.Close()
+}
+
+func (sample *Sample) toLines() {
+	matLines := gocv.NewMat()
+	dst := gocv.NewMatWithSize(sample.Height(), sample.Width(), 0)
+
+	gocv.HoughLinesPWithParams(
+		sample.mat,
+		&matLines,
+		1,
+		math.Pi/180,
+		17,
+		3,
+		11,
+	)
+
+	for i := 0; i < matLines.Rows(); i++ {
+		pt1 := image.Pt(int(matLines.GetVeciAt(i, 0)[0]), int(matLines.GetVeciAt(i, 0)[1]))
+		pt2 := image.Pt(int(matLines.GetVeciAt(i, 0)[2]), int(matLines.GetVeciAt(i, 0)[3]))
+		gocv.Line(&dst, pt1, pt2, color.RGBA{255, 255, 255, 0}, 1)
+	}
+
+	_ = matLines.Close()
+	_ = sample.mat.Close()
+	sample.mat = dst.Clone()
+	_ = dst.Close()
+}
+
+func (sample *Sample) zhangSuen() {
+	s1Flag := true
+	s2Flag := true
+	for s1Flag || s2Flag {
+		s1Marks := make([][2]int, 0)
+		for r := 0; r < sample.Height(); r++ {
+			for c := 0; c < sample.Width(); c++ {
+				if Step1ConditionsMet(sample, r, c) {
+					s1Marks = append(s1Marks, [2]int{r, c})
+				}
+			}
+		}
+		s1Flag = len(s1Marks) > 0
+		if s1Flag {
+			for _, rc := range s1Marks {
+				sample.mat.SetUCharAt(rc[0], rc[1], 0)
+			}
+		}
+
+		s2Marks := make([][2]int, 0)
+		for r := 0; r < sample.Height(); r++ {
+			for c := 0; c < sample.Width(); c++ {
+				if Step2ConditionsMet(sample, r, c) {
+					s2Marks = append(s2Marks, [2]int{r, c})
+				}
+			}
+		}
+		s2Flag = len(s2Marks) > 0
+		if s2Flag {
+			for _, rc := range s2Marks {
+				sample.mat.SetUCharAt(rc[0], rc[1], 0)
+			}
+		}
+	}
 }
 
 func (sample *Sample) crop() {
@@ -110,7 +189,9 @@ func (sample *Sample) crop() {
 	}
 	dst = sample.mat.Region(rect)
 
+	_ = sample.mat.Close()
 	sample.mat = dst.Clone()
+	_ = dst.Close()
 }
 
 func (sample *Sample) Resize(width int, ratio float64) {
@@ -127,7 +208,9 @@ func (sample *Sample) Resize(width int, ratio float64) {
 	}
 	gocv.Resize(sample.mat, &dst, point, 0.0, 0.0, gocv.InterpolationNearestNeighbor)
 
-	sample.mat = dst
+	_ = sample.mat.Close()
+	sample.mat = dst.Clone()
+	_ = dst.Close()
 }
 
 func (sample *Sample) Show() {
@@ -150,14 +233,17 @@ func (sample *Sample) String() string {
 		sample.ratio)
 }
 
+func (sample *Sample) Close() {
+	_ = sample.mat.Close()
+}
+
 type SampleGrid struct {
 	sample      *Sample
-	fieldHeight int
-	fieldWidth  int
-	stride      int
-	rows        int
-	cols        int
-	fields      [][]*Sample
+	fieldHeight uint16
+	fieldWidth  uint16
+	stride      uint8
+	rows        uint8
+	cols        uint8
 	mutex       sync.Mutex
 }
 
@@ -167,86 +253,84 @@ type SampleGrid struct {
 //	return
 //}
 
-func calcGridSize(h, w float64, r, c int) (height, width float64) {
-	height = math.Ceil(h - Stride*float64(r-1))
-	width = math.Ceil(w - Stride*float64(c-1))
-	if height < 0 {
-		panic("decrease number of rows")
+func calcGridSize(height, width float64, rows, cols uint8) (uint16, uint16) {
+	h := math.Ceil(height - Stride*float64(rows-1))
+	w := math.Ceil(width - Stride*float64(cols-1))
+	if h < 0 {
+		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
 	}
-	if width < 0 {
-		panic("decrease number of columns")
+	if w < 0 {
+		panic(fmt.Sprintf("decrease number of columns (%.0f, %.0f)", height, width))
 	}
-	return
+	return uint16(h), uint16(w)
 }
 
-func NewSampleGrid(sample *Sample, rows, cols int) *SampleGrid {
+func NewSampleGrid(sample *Sample, rows, cols uint8) *SampleGrid {
 	height, width := calcGridSize(float64(sample.height), float64(sample.width), rows, cols)
-	fields := make([][]*Sample, rows)
-	for i := range fields {
-		fields[i] = make([]*Sample, cols)
-		for j := range fields[i] {
-			fields[i][j] = nil
-		}
-	}
 	return &SampleGrid{
 		sample:      sample,
-		fieldHeight: int(height),
-		fieldWidth:  int(width),
-		stride:      int(Stride),
+		fieldHeight: height,
+		fieldWidth:  width,
+		stride:      Stride,
 		rows:        rows,
 		cols:        cols,
-		fields:      fields,
 	}
 }
 
-func (sgrid *SampleGrid) String() string {
+func (sg *SampleGrid) String() string {
 	return fmt.Sprintf(
 		"<SampleGrid %dx%d, (%d, %d), %d>",
-		sgrid.rows,
-		sgrid.cols,
-		sgrid.fieldHeight,
-		sgrid.fieldWidth,
-		sgrid.stride,
+		sg.rows,
+		sg.cols,
+		sg.fieldHeight,
+		sg.fieldWidth,
+		sg.stride,
 	)
 }
 
-func (sgrid *SampleGrid) At(row, col int) *Sample {
-	sgrid.mutex.Lock()
-	defer sgrid.mutex.Unlock()
-	if sgrid.fields[row][col] == nil {
-		s := &Sample{
-			mat:    gocv.NewMat(),
-			height: sgrid.fieldHeight,
-			width:  sgrid.fieldWidth,
-			ratio:  float64(sgrid.fieldWidth) / float64(sgrid.fieldHeight),
-		}
-		x1 := col * sgrid.stride
-		y1 := row * sgrid.stride
-		x2 := x1 + sgrid.fieldWidth
-		if x2 > sgrid.sample.width {
-			x2 = sgrid.sample.width
-		}
-		y2 := y1 + sgrid.fieldHeight
-		if y2 > sgrid.sample.height {
-			y2 = sgrid.sample.height
-		}
-
-		if x2 <= x1 || y2 <= y1 {
-			panic("at the disco")
-		}
-
-		rect := image.Rect(x1, y1, x2, y2)
-		s.mat = sgrid.sample.mat.Region(rect)
-		sgrid.fields[row][col] = s
+func (sg *SampleGrid) At(row, col int) *Sample {
+	sg.mutex.Lock()
+	defer sg.mutex.Unlock()
+	s := &Sample{
+		mat:    gocv.NewMat(),
+		height: sg.fieldHeight,
+		width:  sg.fieldWidth,
+		ratio:  float64(sg.fieldWidth) / float64(sg.fieldHeight),
 	}
-	return sgrid.fields[row][col]
+	var x1, y1, x2, y2 int
+	if col >= 0 {
+		x1 = col * int(sg.stride)
+	} else {
+		x1 = 0
+	}
+	if row >= 0 {
+		y1 = row * int(sg.stride)
+	} else {
+		y1 = 0
+	}
+	x2 = x1 + int(sg.fieldWidth)
+	if x2 > int(sg.sample.width) || col < 0 {
+		x2 = int(sg.sample.width)
+	}
+	y2 = y1 + int(sg.fieldHeight)
+	if y2 > int(sg.sample.height) || row < 0 {
+		y2 = int(sg.sample.height)
+	}
+
+	if x2 <= x1 || y2 <= y1 {
+		panic("at the disco")
+	}
+
+	rect := image.Rect(x1, y1, x2, y2)
+	s.mat = sg.sample.mat.Region(rect)
+	return s
 }
 
-func (sgrid *SampleGrid) Show() {
+func (sg *SampleGrid) Show() {
 	var windows []*gocv.Window
-	for i := range sgrid.fields {
-		for j := range sgrid.fields[i] {
-			sample := sgrid.At(i, j)
+	for i := 0; i < int(sg.cols); i++ {
+		for j := 0; j < int(sg.rows); j++ {
+			sample := sg.At(i, j)
 			window := gocv.NewWindow(fmt.Sprintf("[%d, %d]", i, j))
 			window.ResizeWindow(sample.Width(), sample.Height())
 			window.IMShow(sample.Mat())
@@ -265,7 +349,7 @@ loop:
 	}
 	for _, window := range windows {
 		if window.IsOpen() {
-			window.Close()
+			_ = window.Close()
 		}
 	}
 }

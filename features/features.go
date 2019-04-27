@@ -12,11 +12,13 @@ import (
 type Features struct {
 	basic FeatureMap
 	grid  [][]FeatureMap
-	rows  int
-	cols  int
+	row   []FeatureMap
+	col   []FeatureMap
+	rows  uint8
+	cols  uint8
 }
 
-func NewFeatures(rows, cols int) *Features {
+func NewFeatures(rows, cols uint8) *Features {
 	g := make([][]FeatureMap, rows)
 	for i := range g {
 		g[i] = make([]FeatureMap, cols)
@@ -27,6 +29,18 @@ func NewFeatures(rows, cols int) *Features {
 			}
 		}
 	}
+	r := make([]FeatureMap, rows)
+	for i := range r {
+		r[i] = FeatureMap{
+			"length": NewFeature("length", length),
+		}
+	}
+	c := make([]FeatureMap, cols)
+	for i := range c {
+		c[i] = FeatureMap{
+			"length": NewFeature("length", length),
+		}
+	}
 	return &Features{
 		basic: FeatureMap{
 			"aspect":   NewFeature("aspect", aspect),
@@ -34,6 +48,8 @@ func NewFeatures(rows, cols int) *Features {
 			"gradient": NewFeature("gradient", gradient),
 		},
 		grid: g,
+		row:  r,
+		col:  c,
 		rows: rows,
 		cols: cols,
 	}
@@ -47,7 +63,44 @@ func (f *Features) String() string {
 	return fmt.Sprintf("<Features %s>", sb.String())
 }
 
-func (f *Features) Score(sample *samples.Sample) (float64, float64, *Features) {
+type Score struct {
+	basic float64
+	grid  float64
+	row   float64
+	col   float64
+}
+
+func (s *Score) Basic() float64 {
+	return s.basic
+}
+
+func (s *Score) Grid() float64 {
+	return s.grid
+}
+
+func (s *Score) Row() float64 {
+	return s.row
+}
+
+func (s *Score) Col() float64 {
+	return s.col
+}
+
+func (s *Score) Check(t float64, weights []float64) (bool, error) {
+	if weights == nil {
+		weights = []float64{1.0, 1.0, 1.0, 1.0}
+	} else if len(weights) != 4 {
+		return false, fmt.Errorf("weights have to be nil or length 4: [basic, grid, row, col]")
+	}
+	for i, score := range []float64{s.basic, s.grid, s.row, s.col} {
+		if score >= (t * weights[i]) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 	pattern := NewFeatures(f.rows, f.cols)
 	//sample.Resize(sample.Width(), 0.0)
 	pattern.Extract(sample, 1)
@@ -72,22 +125,44 @@ func (f *Features) Score(sample *samples.Sample) (float64, float64, *Features) {
 			gss[i][j] = stat.Mean(ss, nil)
 		}
 	}
-	rowScores := make([]float64, f.rows)
+	gRowScores := make([]float64, f.rows)
 	for i, row := range gss {
-		rowScores[i] = stat.Mean(row, nil)
+		gRowScores[i] = stat.Mean(row, nil)
 	}
-	gridScore := stat.Mean(rowScores, nil)
+	gridScore := stat.Mean(gRowScores, nil)
 
-	return basicScore, gridScore, pattern
+	rss := make([]float64, f.rows)
+	for i := range rss {
+		ss := make([]float64, 0)
+		for key, template := range f.row[i] {
+			s := stat.StdScore(pattern.row[i][key].mean, template.mean, template.std)
+			ss = append(ss, math.Abs(s))
+		}
+		rss[i] = stat.Mean(ss, nil)
+	}
+	rowScore := stat.Mean(rss, nil)
+
+	css := make([]float64, f.cols)
+	for i := range css {
+		ss := make([]float64, 0)
+		for key, template := range f.col[i] {
+			s := stat.StdScore(pattern.col[i][key].mean, template.mean, template.std)
+			ss = append(ss, math.Abs(s))
+		}
+		css[i] = stat.Mean(ss, nil)
+	}
+	colScore := stat.Mean(css, nil)
+
+	return &Score{basicScore, gridScore, rowScore, colScore}, pattern
 }
 
 func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	sample.Update()
 
 	var wg sync.WaitGroup
-	wg.Add(len(f.basic))
 
 	for _, ftr := range f.basic {
+		wg.Add(1)
 		go func(ftr *Feature) {
 			defer wg.Done()
 			ftr.Update(sample, nSamples)
@@ -97,13 +172,33 @@ func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
 	for i := range f.grid {
 		for j := range f.grid[i] {
-			wg.Add(len(f.grid[i][j]))
 			for _, ftr := range f.grid[i][j] {
+				wg.Add(1)
 				go func(ftr *Feature) {
 					defer wg.Done()
 					ftr.Update(sampleGrid.At(i, j), nSamples)
 				}(ftr)
 			}
+		}
+	}
+
+	for i := range f.row {
+		for _, ftr := range f.row[i] {
+			wg.Add(1)
+			go func(ftr *Feature) {
+				defer wg.Done()
+				ftr.Update(sampleGrid.At(i, -1), nSamples)
+			}(ftr)
+		}
+	}
+
+	for i := range f.col {
+		for _, ftr := range f.col[i] {
+			wg.Add(1)
+			go func(ftr *Feature) {
+				defer wg.Done()
+				ftr.Update(sampleGrid.At(-1, i), nSamples)
+			}(ftr)
 		}
 	}
 

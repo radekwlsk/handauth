@@ -14,13 +14,23 @@ func (s *UserSample) Sample() *Sample {
 	return s.sample
 }
 
-func NewSignature(username, filename string) UserSample {
-	im := NewSample(filename)
-	s := UserSample{
+func NewUserSample(username, filename string) (*UserSample, error) {
+	im, err := NewSample(filename)
+	if err != nil {
+		return nil, err
+	}
+	s := &UserSample{
 		user:   username,
 		sample: im,
 	}
-	return s
+	return s, err
+}
+
+func (s *UserSample) Copy() *UserSample {
+	return &UserSample{
+		user:   s.user,
+		sample: s.sample.Copy(),
+	}
 }
 
 func (s *UserSample) Preprocess() {
@@ -37,4 +47,8 @@ func (s *UserSample) Show() {
 			break
 		}
 	}
+}
+
+func (s *UserSample) Close() {
+	s.sample.Close()
 }
