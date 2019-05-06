@@ -114,42 +114,42 @@ func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 	basicScore := stat.Mean(ss, nil)
 
 	gss := make([][]float64, f.rows)
-	for i := range gss {
-		gss[i] = make([]float64, f.cols)
-		for j := range gss[i] {
+	for r := range gss {
+		gss[r] = make([]float64, f.cols)
+		for c := range gss[r] {
 			ss := make([]float64, 0)
-			for key, template := range f.grid[i][j] {
-				s := stat.StdScore(pattern.grid[i][j][key].mean, template.mean, template.std)
+			for key, template := range f.grid[r][c] {
+				s := stat.StdScore(pattern.grid[r][c][key].mean, template.mean, template.std)
 				ss = append(ss, math.Abs(s))
 			}
-			gss[i][j] = stat.Mean(ss, nil)
+			gss[r][c] = stat.Mean(ss, nil)
 		}
 	}
 	gRowScores := make([]float64, f.rows)
-	for i, row := range gss {
-		gRowScores[i] = stat.Mean(row, nil)
+	for r, row := range gss {
+		gRowScores[r] = stat.Mean(row, nil)
 	}
 	gridScore := stat.Mean(gRowScores, nil)
 
 	rss := make([]float64, f.rows)
-	for i := range rss {
+	for r := range rss {
 		ss := make([]float64, 0)
-		for key, template := range f.row[i] {
-			s := stat.StdScore(pattern.row[i][key].mean, template.mean, template.std)
+		for key, template := range f.row[r] {
+			s := stat.StdScore(pattern.row[r][key].mean, template.mean, template.std)
 			ss = append(ss, math.Abs(s))
 		}
-		rss[i] = stat.Mean(ss, nil)
+		rss[r] = stat.Mean(ss, nil)
 	}
 	rowScore := stat.Mean(rss, nil)
 
 	css := make([]float64, f.cols)
-	for i := range css {
+	for c := range css {
 		ss := make([]float64, 0)
-		for key, template := range f.col[i] {
-			s := stat.StdScore(pattern.col[i][key].mean, template.mean, template.std)
+		for key, template := range f.col[c] {
+			s := stat.StdScore(pattern.col[c][key].mean, template.mean, template.std)
 			ss = append(ss, math.Abs(s))
 		}
-		css[i] = stat.Mean(ss, nil)
+		css[c] = stat.Mean(ss, nil)
 	}
 	colScore := stat.Mean(css, nil)
 
@@ -170,34 +170,34 @@ func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	}
 
 	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
-	for i := range f.grid {
-		for j := range f.grid[i] {
-			for _, ftr := range f.grid[i][j] {
+	for r := range f.grid {
+		for c := range f.grid[r] {
+			for _, ftr := range f.grid[r][c] {
 				wg.Add(1)
 				go func(ftr *Feature) {
 					defer wg.Done()
-					ftr.Update(sampleGrid.At(i, j), nSamples)
+					ftr.Update(sampleGrid.At(r, c), nSamples)
 				}(ftr)
 			}
 		}
 	}
 
-	for i := range f.row {
-		for _, ftr := range f.row[i] {
+	for r := range f.row {
+		for _, ftr := range f.row[r] {
 			wg.Add(1)
 			go func(ftr *Feature) {
 				defer wg.Done()
-				ftr.Update(sampleGrid.At(i, -1), nSamples)
+				ftr.Update(sampleGrid.At(r, -1), nSamples)
 			}(ftr)
 		}
 	}
 
-	for i := range f.col {
-		for _, ftr := range f.col[i] {
+	for c := range f.col {
+		for _, ftr := range f.col[c] {
 			wg.Add(1)
 			go func(ftr *Feature) {
 				defer wg.Done()
-				ftr.Update(sampleGrid.At(-1, i), nSamples)
+				ftr.Update(sampleGrid.At(-1, c), nSamples)
 			}(ftr)
 		}
 	}
