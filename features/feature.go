@@ -75,12 +75,6 @@ func (f *Feature) Update(sample *samples.Sample, nSamples int) {
 	}
 }
 
-//
-//type Features interface {
-//	Score(filename string) float64
-//	Extract(filename string)
-//}
-
 func aspect(sample *samples.Sample) float64 {
 	return sample.Ratio()
 }
