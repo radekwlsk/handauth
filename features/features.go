@@ -4,10 +4,15 @@ import (
 	"fmt"
 	"github.com/radekwlsk/handauth/samples"
 	"gonum.org/v1/gonum/stat"
+	"log"
 	"math"
+	"os"
 	"strings"
 	"sync"
 )
+
+var Debug = false
+var logger = log.New(os.Stdout, "[features] ", log.Lshortfile+log.Ltime)
 
 type Features struct {
 	basic FeatureMap
@@ -102,12 +107,14 @@ func (s *Score) Check(t float64, weights []float64) (bool, error) {
 
 func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 	pattern := NewFeatures(f.rows, f.cols)
-	//sample.Resize(sample.Width(), 0.0)
 	pattern.Extract(sample, 1)
 
 	ss := make([]float64, 0)
 	for key, template := range f.basic {
-		//fmt.Printf("%s: pattern: %f, mean: %f, std: %f\n", key, pattern[key].mean, f[key].mean, f[key].std)
+		if Debug {
+			logger.Printf("score basic %s: pattern: %f, mean: %f, std: %f\n",
+				key, pattern.basic[key].mean, f.basic[key].mean, f.basic[key].std)
+		}
 		s := stat.StdScore(pattern.basic[key].mean, template.mean, template.std)
 		ss = append(ss, math.Abs(s))
 	}
@@ -119,6 +126,10 @@ func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 		for c := range gss[r] {
 			ss := make([]float64, 0)
 			for key, template := range f.grid[r][c] {
+				if Debug {
+					logger.Printf("score grid (%d,%d) %s: pattern: %f, mean: %f, std: %f\n",
+						r, c, key, pattern.grid[r][c][key].mean, f.grid[r][c][key].mean, f.grid[r][c][key].std)
+				}
 				s := stat.StdScore(pattern.grid[r][c][key].mean, template.mean, template.std)
 				ss = append(ss, math.Abs(s))
 			}
@@ -135,6 +146,10 @@ func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 	for r := range rss {
 		ss := make([]float64, 0)
 		for key, template := range f.row[r] {
+			if Debug {
+				logger.Printf("score row %d %s: pattern: %f, mean: %f, std: %f\n",
+					r, key, pattern.row[r][key].mean, f.row[r][key].mean, f.row[r][key].std)
+			}
 			s := stat.StdScore(pattern.row[r][key].mean, template.mean, template.std)
 			ss = append(ss, math.Abs(s))
 		}
@@ -146,6 +161,10 @@ func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
 	for c := range css {
 		ss := make([]float64, 0)
 		for key, template := range f.col[c] {
+			if Debug {
+				logger.Printf("score col %d %s: pattern: %f, mean: %f, std: %f\n",
+					c, key, pattern.col[c][key].mean, f.col[c][key].mean, f.col[c][key].std)
+			}
 			s := stat.StdScore(pattern.col[c][key].mean, template.mean, template.std)
 			ss = append(ss, math.Abs(s))
 		}
