@@ -374,12 +374,7 @@ func (sg *SampleGrid) String() string {
 func (sg *SampleGrid) At(row, col int) *Sample {
 	sg.mutex.Lock()
 	defer sg.mutex.Unlock()
-	s := &Sample{
-		mat:    gocv.NewMat(),
-		height: sg.fieldHeight,
-		width:  sg.fieldWidth,
-		ratio:  float64(sg.fieldWidth) / float64(sg.fieldHeight),
-	}
+
 	var x1, y1, x2, y2 int
 	if col >= 0 {
 		x1 = col * int(sg.xStride)
@@ -405,7 +400,13 @@ func (sg *SampleGrid) At(row, col int) *Sample {
 	}
 
 	rect := image.Rect(x1, y1, x2, y2)
-	s.mat = sg.sample.mat.Region(rect)
+	region := sg.sample.mat.Region(rect)
+	s := &Sample{
+		mat:    region,
+		height: sg.fieldHeight,
+		width:  sg.fieldWidth,
+		ratio:  float64(sg.fieldWidth) / float64(sg.fieldHeight),
+	}
 	return s
 }
 
