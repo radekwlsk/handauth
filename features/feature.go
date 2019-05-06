@@ -9,11 +9,13 @@ import (
 	"strings"
 )
 
-type FeatureType string
+type FeatureType int
 
 const (
-	Basic FeatureType = "Features"
-	Grid  FeatureType = "GridFeatures"
+	BasicFeaturesType FeatureType = 0
+	RowFeaturesType   FeatureType = 1
+	ColFeaturesType   FeatureType = 2
+	GridFeaturesType  FeatureType = RowFeaturesType + ColFeaturesType
 )
 
 type Feature struct {
