@@ -93,7 +93,7 @@ func (s *Score) Check(t float64, weights []float64) (bool, error) {
 		return false, fmt.Errorf("weights have to be nil or length 4: [basic, grid, row, col]")
 	}
 	for i, score := range []float64{s.basic, s.grid, s.row, s.col} {
-		if score >= (t * weights[i]) {
+		if (score * weights[i]) >= t {
 			return false, nil
 		}
 	}
