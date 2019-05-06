@@ -241,7 +241,8 @@ type SampleGrid struct {
 	sample      *Sample
 	fieldHeight uint16
 	fieldWidth  uint16
-	stride      uint8
+	yStride     uint8
+	xStride     uint8
 	rows        uint8
 	cols        uint8
 	mutex       sync.Mutex
@@ -253,9 +254,9 @@ type SampleGrid struct {
 //	return
 //}
 
-func calcGridSize(height, width float64, rows, cols uint8) (uint16, uint16) {
-	h := math.Ceil(height - Stride*float64(rows-1))
-	w := math.Ceil(width - Stride*float64(cols-1))
+func calcGridSize(height, width float64, rows, cols, yStride, xStride uint8) (uint16, uint16) {
+	h := math.Ceil(height - float64(yStride)*float64(rows-1))
+	w := math.Ceil(width - float64(xStride)*float64(cols-1))
 	if h < 0 {
 		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
 	}
@@ -266,12 +267,18 @@ func calcGridSize(height, width float64, rows, cols uint8) (uint16, uint16) {
 }
 
 func NewSampleGrid(sample *Sample, rows, cols uint8) *SampleGrid {
-	height, width := calcGridSize(float64(sample.height), float64(sample.width), rows, cols)
+	//yStride := uint8(math.Ceil(float64(sample.height) / float64(rows * 2)))
+	//xStride := uint8(math.Ceil(float64(sample.width) / float64(cols * 2)))
+	xStride := uint8(Stride)
+	yStride := uint8(math.Floor(Stride / sample.ratio))
+
+	height, width := calcGridSize(float64(sample.height), float64(sample.width), rows, cols, yStride, xStride)
 	return &SampleGrid{
 		sample:      sample,
 		fieldHeight: height,
 		fieldWidth:  width,
-		stride:      Stride,
+		yStride:     yStride,
+		xStride:     xStride,
 		rows:        rows,
 		cols:        cols,
 	}
@@ -279,12 +286,13 @@ func NewSampleGrid(sample *Sample, rows, cols uint8) *SampleGrid {
 
 func (sg *SampleGrid) String() string {
 	return fmt.Sprintf(
-		"<SampleGrid %dx%d, (%d, %d), %d>",
+		"<SampleGrid %dx%d, (%d, %d), [%d/%d]>",
 		sg.rows,
 		sg.cols,
 		sg.fieldHeight,
 		sg.fieldWidth,
-		sg.stride,
+		sg.yStride,
+		sg.xStride,
 	)
 }
 
@@ -299,12 +307,12 @@ func (sg *SampleGrid) At(row, col int) *Sample {
 	}
 	var x1, y1, x2, y2 int
 	if col >= 0 {
-		x1 = col * int(sg.stride)
+		x1 = col * int(sg.xStride)
 	} else {
 		x1 = 0
 	}
 	if row >= 0 {
-		y1 = row * int(sg.stride)
+		y1 = row * int(sg.yStride)
 	} else {
 		y1 = 0
 	}
