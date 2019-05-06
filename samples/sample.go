@@ -21,6 +21,9 @@ const (
 	Stride      = 20.0
 )
 
+var Debug = false
+var logger = log.New(os.Stdout, "[sample] ", log.Lshortfile+log.Ltime)
+
 type Sample struct {
 	mat    gocv.Mat
 	height uint16
@@ -36,6 +39,12 @@ func NewSample(filename string) (*Sample, error) {
 		ratio:  0.0,
 	}
 	err := s.read(filename)
+	if s.Empty() {
+		return nil, fmt.Errorf("could not read file %s", filename)
+	}
+	if Debug {
+		logger.Printf("read sample from %s: %s\n", filename, s)
+	}
 	return s, err
 }
 
@@ -46,6 +55,10 @@ func (sample *Sample) Copy() *Sample {
 		width:  sample.width,
 		ratio:  sample.ratio,
 	}
+}
+
+func (sample *Sample) Empty() bool {
+	return sample.mat.Empty()
 }
 
 func (sample *Sample) MatType() gocv.MatType {
@@ -80,11 +93,29 @@ func (sample *Sample) read(name string) error {
 
 func (sample *Sample) Preprocess(ratio float64) {
 	sample.normalize()
+	if Debug {
+		sample.Save("res", "normalized", false)
+	}
 	sample.foreground()
+	if Debug {
+		sample.Save("res", "foreground", false)
+	}
 	sample.crop()
+	if Debug {
+		sample.Save("res", "cropped", false)
+	}
 	sample.Resize(TargetWidth, ratio)
+	if Debug {
+		sample.Save("res", "resized", false)
+	}
 	sample.zhangSuen()
-	//sample.toLines()
+	if Debug {
+		sample.Save("res", "thinned", false)
+	}
+	sample.toLines()
+	if Debug {
+		sample.Save("res", "lines approximated", false)
+	}
 }
 
 func (sample *Sample) Update() {
