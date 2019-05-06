@@ -1,10 +1,5 @@
 package samples
 
-import (
-	"fmt"
-	"gocv.io/x/gocv"
-)
-
 type UserSample struct {
 	user   string
 	sample *Sample
@@ -37,16 +32,8 @@ func (s *UserSample) Preprocess() {
 	s.sample.Preprocess(0.0)
 }
 
-func (s *UserSample) Show() {
-	window := gocv.NewWindow(fmt.Sprintf("%s's signature (%dx%d)", s.user, s.sample.Width(), s.sample.Height()))
-	defer window.Close()
-	window.ResizeWindow(s.sample.Width(), s.sample.Height())
-	window.IMShow(s.sample.Mat())
-	for window.IsOpen() {
-		if window.WaitKey(1) > 0 {
-			break
-		}
-	}
+func (s *UserSample) Save(dir, filename string, show bool) {
+	s.sample.Save(dir, filename, show)
 }
 
 func (s *UserSample) Close() {
