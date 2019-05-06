@@ -2,10 +2,17 @@ package samples
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"gocv.io/x/gocv"
 	"image"
 	"image/color"
+	"image/png"
+	"log"
 	"math"
+	"os"
+	"os/exec"
+	"path"
+	"strings"
 	"sync"
 )
 
@@ -213,16 +220,53 @@ func (sample *Sample) Resize(width int, ratio float64) {
 	_ = dst.Close()
 }
 
-func (sample *Sample) Show() {
-	window := gocv.NewWindow(fmt.Sprintf("(%dx%d)", sample.Width(), sample.Height()))
-	defer window.Close()
-	window.ResizeWindow(sample.Width(), sample.Height())
-	window.IMShow(sample.Mat())
-	for window.IsOpen() {
-		if window.WaitKey(1) > 0 {
-			break
-		}
+func (sample *Sample) ColorModel() color.Model {
+	switch sample.MatType() {
+	case gocv.MatTypeCV8UC3:
+		return color.RGBAModel
+	default:
+		return color.GrayModel
 	}
+}
+
+func (sample *Sample) Bounds() image.Rectangle {
+	return image.Rect(0, 0, sample.mat.Cols()-1, sample.mat.Rows()-1)
+}
+
+func (sample *Sample) At(x, y int) color.Color {
+	c := sample.mat.GetUCharAt(y, x)
+	return color.RGBA{c, c, c, 0}
+}
+
+func (sample *Sample) Save(dir, filename string, show bool) string {
+	filename = strings.ReplaceAll(filename, " ", "_")
+	filepath := fmt.Sprintf("%s-%s.png", path.Join(dir, filename), uuid.New().String()[:8])
+	f, err := os.Create(filepath)
+	if err != nil {
+		log.Println(err)
+	}
+	if err := png.Encode(f, sample); err != nil {
+		_ = f.Close()
+		log.Println(err)
+	}
+	if err := f.Close(); err != nil {
+		log.Println(err)
+	}
+	if Debug {
+		log.Printf("saved sample %s as %s", sample, f.Name())
+	}
+	if show {
+		command := "display"
+		cmd := exec.Command(command, filepath)
+		go func() {
+			err := cmd.Run()
+			if err != nil {
+				log.Fatal(err)
+
+			}
+		}()
+	}
+	return filepath
 }
 
 func (sample *Sample) String() string {
@@ -334,30 +378,11 @@ func (sg *SampleGrid) At(row, col int) *Sample {
 	return s
 }
 
-func (sg *SampleGrid) Show() {
-	var windows []*gocv.Window
-	for i := 0; i < int(sg.cols); i++ {
-		for j := 0; j < int(sg.rows); j++ {
-			sample := sg.At(i, j)
-			window := gocv.NewWindow(fmt.Sprintf("[%d, %d]", i, j))
-			window.ResizeWindow(sample.Width(), sample.Height())
-			window.IMShow(sample.Mat())
-			windows = append(windows, window)
-		}
-	}
-loop:
-	for {
-		for _, window := range windows {
-			if window.IsOpen() {
-				if window.WaitKey(1) > 0 {
-					break loop
-				}
-			}
-		}
-	}
-	for _, window := range windows {
-		if window.IsOpen() {
-			_ = window.Close()
+func (sg *SampleGrid) Save(dir, filename string, show bool) {
+	for r := 0; r < int(sg.rows); r++ {
+		for c := 0; c < int(sg.cols); c++ {
+			sample := sg.At(r, c)
+			sample.Save(dir, fmt.Sprintf("%s-col%d_row%d", filename, c, r), show)
 		}
 	}
 }
