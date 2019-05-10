@@ -3,6 +3,7 @@ package flags
 import (
 	"flag"
 	"fmt"
+	"github.com/radekwlsk/handauth/features"
 	"strconv"
 )
 
@@ -47,12 +48,12 @@ func Thresholds() []float64 {
 	return thresholds
 }
 
-func ThresholdWeights() []float64 {
-	return []float64{
-		*basicThresholdScale,
-		*gridThresholdScale,
-		*rowThresholdScale,
-		*colThresholdScale,
+func ThresholdWeights() map[features.AreaType]float64 {
+	return map[features.AreaType]float64{
+		features.BasicAreaType: *basicThresholdScale,
+		features.GridAreaType:  *gridThresholdScale,
+		features.RowAreaType:   *rowThresholdScale,
+		features.ColAreaType:   *colThresholdScale,
 	}
 }
 

@@ -8,218 +8,259 @@ import (
 	"math"
 	"os"
 	"strings"
-	"sync"
 )
 
 var Debug = false
 var logger = log.New(os.Stdout, "[features] ", log.Lshortfile+log.Ltime)
 
+var AreaFlags = map[AreaType]bool{
+	BasicAreaType: true,
+	RowAreaType:   true,
+	ColAreaType:   true,
+	GridAreaType:  true,
+}
+
+var FeatureFlags = map[FeatureType]bool{
+	LengthFeatureType:   true,
+	GradientFeatureType: true,
+	AspectFeatureType:   true,
+}
+
 type Features struct {
 	basic FeatureMap
-	grid  [][]FeatureMap
-	row   []FeatureMap
-	col   []FeatureMap
+	grid  GridFeatureMap
+	row   RowFeatureMap
+	col   ColFeatureMap
 	rows  uint8
 	cols  uint8
 }
 
-func NewFeatures(rows, cols uint8) *Features {
-	g := make([][]FeatureMap, rows)
-	for i := range g {
-		g[i] = make([]FeatureMap, cols)
-		for j := range g[i] {
-			g[i][j] = FeatureMap{
-				"length":   NewFeature("length", length),
-				"gradient": NewFeature("gradient", gradient),
+func NewFeatures(rows, cols uint8, template *Features) *Features {
+	var rowKeys, colKeys []int
+	var gridKeys [][2]int
+	if template == nil {
+		rowKeys = make([]int, rows)
+		for i := 0; i < int(rows); i++ {
+			rowKeys[i] = i
+		}
+		colKeys = make([]int, cols)
+		for i := 0; i < int(cols); i++ {
+			colKeys[i] = i
+		}
+		for _, r := range rowKeys {
+			for _, c := range colKeys {
+				gridKeys = append(gridKeys, [2]int{r, c})
+			}
+		}
+	} else {
+		for r := range template.row {
+			rowKeys = append(rowKeys, r)
+		}
+		for c := range template.col {
+			colKeys = append(colKeys, c)
+		}
+		for rc := range template.grid {
+			gridKeys = append(gridKeys, rc)
+		}
+	}
+	return newFeatures(rows, cols, rowKeys, colKeys, gridKeys)
+}
+
+func newFeatures(rows, cols uint8, rowKeys, colKeys []int, gridKeys [][2]int) *Features {
+	var basic FeatureMap
+	var grid GridFeatureMap
+	var row RowFeatureMap
+	var col ColFeatureMap
+
+	if AreaFlags[BasicAreaType] {
+		basic = FeatureMap{
+			LengthFeatureType:   NewLengthFeature(),
+			GradientFeatureType: NewGradientFeature(),
+			AspectFeatureType:   NewAspectFeature(),
+		}
+	}
+	if AreaFlags[GridAreaType] {
+		grid = make(GridFeatureMap)
+		for _, rc := range gridKeys {
+			grid[rc] = FeatureMap{
+				LengthFeatureType:   NewLengthFeature(),
+				GradientFeatureType: NewGradientFeature(),
 			}
 		}
 	}
-	r := make([]FeatureMap, rows)
-	for i := range r {
-		r[i] = FeatureMap{
-			"length": NewFeature("length", length),
+	if AreaFlags[RowAreaType] {
+		row = make(RowFeatureMap)
+		for _, r := range rowKeys {
+			row[r] = FeatureMap{
+				LengthFeatureType: NewLengthFeature(),
+			}
 		}
 	}
-	c := make([]FeatureMap, cols)
-	for i := range c {
-		c[i] = FeatureMap{
-			"length": NewFeature("length", length),
+	if AreaFlags[ColAreaType] {
+		col = make(ColFeatureMap)
+		for _, c := range colKeys {
+			col[c] = FeatureMap{
+				LengthFeatureType: NewLengthFeature(),
+			}
 		}
 	}
 	return &Features{
-		basic: FeatureMap{
-			"aspect":   NewFeature("aspect", aspect),
-			"length":   NewFeature("length", length),
-			"gradient": NewFeature("gradient", gradient),
-		},
-		grid: g,
-		row:  r,
-		col:  c,
-		rows: rows,
-		cols: cols,
+		basic: basic,
+		grid:  grid,
+		row:   row,
+		col:   col,
+		rows:  rows,
+		cols:  cols,
 	}
 }
 
-func (f *Features) String() string {
+func (f *Features) GoString() string {
 	var sb strings.Builder
-	for _, ftr := range f.basic {
-		sb.WriteString(ftr.String())
-	}
-	return fmt.Sprintf("<Features %s>", sb.String())
+	sb.WriteString(fmt.Sprintf("\t%#v\n", f.basic))
+	sb.WriteString(fmt.Sprintf("\t%#v\n", f.grid))
+	return fmt.Sprintf("<%T \n%s>", f, sb.String())
 }
 
-type Score struct {
-	basic float64
-	grid  float64
-	row   float64
-	col   float64
-}
+type Score map[AreaType]float64
 
-func (s *Score) Basic() float64 {
-	return s.basic
-}
-
-func (s *Score) Grid() float64 {
-	return s.grid
-}
-
-func (s *Score) Row() float64 {
-	return s.row
-}
-
-func (s *Score) Col() float64 {
-	return s.col
-}
-
-func (s *Score) Check(t float64, weights []float64) (bool, error) {
-	if weights == nil {
-		weights = []float64{1.0, 1.0, 1.0, 1.0}
-	} else if len(weights) != 4 {
-		return false, fmt.Errorf("weights have to be nil or length 4: [basic, grid, row, col]")
-	}
-	for i, score := range []float64{s.basic, s.grid, s.row, s.col} {
-		if (score * weights[i]) >= t {
+func (s Score) Check(t float64, weights map[AreaType]float64) (bool, error) {
+	var weight float64
+	for area, score := range s {
+		if w, ok := weights[area]; ok {
+			weight = w
+		} else {
+			weight = 1.0
+		}
+		if (score * weight) >= t {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (f *Features) Score(sample *samples.Sample) (*Score, *Features) {
-	pattern := NewFeatures(f.rows, f.cols)
+func scoreBasic(t, s *Features) float64 {
+	ss := make([]float64, 0)
+	for ftrType, ftr := range t.basic {
+		if FeatureFlags[ftrType] {
+			if Debug {
+				logger.Printf("score basic %s: sample: %s, template: %s\n",
+					ftrType, s.basic[ftrType], ftr)
+			}
+			s := ftr.Score(s.basic[ftrType])
+			ss = append(ss, math.Abs(s))
+		}
+	}
+	return stat.Mean(ss, nil)
+}
+
+func scoreGrid(t, s *Features) float64 {
+	gss := make([]float64, len(t.grid))
+	for rc, ftrMap := range t.grid {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				if Debug {
+					logger.Printf("score grid (%d,%d) %s: sample: %s, template: %s\n",
+						rc[0], rc[1], ftrType, s.grid[rc][ftrType], ftr)
+				}
+				s := ftr.Score(s.grid[rc][ftrType])
+				gss = append(gss, math.Abs(s))
+			}
+		}
+	}
+	return stat.Mean(gss, nil)
+}
+
+func scoreRow(t, s *Features) float64 {
+	rss := make([]float64, len(t.row))
+	for r, ftrMap := range t.row {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				if Debug {
+					logger.Printf("score row %d %s: sample: %s, template: %s\n",
+						r, ftrType, s.row[r][ftrType], ftr)
+				}
+				s := ftr.Score(s.row[r][ftrType])
+				rss = append(rss, math.Abs(s))
+			}
+		}
+	}
+	return stat.Mean(rss, nil)
+}
+
+func scoreCol(t, s *Features) float64 {
+	css := make([]float64, len(t.col))
+	for c, ftrMap := range t.col {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				if Debug {
+					logger.Printf("score col %d %s: sample: %s, template: %s\n",
+						c, ftrType, s.col[c][ftrType], ftr)
+				}
+				s := ftr.Score(s.col[c][ftrType])
+				css = append(css, math.Abs(s))
+			}
+		}
+	}
+	return stat.Mean(css, nil)
+}
+
+func (f *Features) getScoreFunc(area AreaType) (func(ftr1, ftr2 *Features) float64, bool) {
+	switch area {
+	case BasicAreaType:
+		return scoreBasic, true
+	case GridAreaType:
+		return scoreGrid, true
+	case RowAreaType:
+		return scoreRow, true
+	case ColAreaType:
+		return scoreCol, true
+	default:
+		return nil, false
+	}
+}
+
+func (f *Features) Score(sample *samples.Sample) (Score, *Features) {
+	pattern := NewFeatures(f.rows, f.cols, f)
 	pattern.Extract(sample, 1)
 
-	ss := make([]float64, 0)
-	for key, template := range f.basic {
-		if Debug {
-			logger.Printf("score basic %s: pattern: %f, mean: %f, std: %f\n",
-				key, pattern.basic[key].mean, f.basic[key].mean, f.basic[key].std)
-		}
-		s := stat.StdScore(pattern.basic[key].mean, template.mean, template.std)
-		ss = append(ss, math.Abs(s))
-	}
-	basicScore := stat.Mean(ss, nil)
+	score := make(Score)
 
-	gss := make([][]float64, f.rows)
-	for r := range gss {
-		gss[r] = make([]float64, f.cols)
-		for c := range gss[r] {
-			ss := make([]float64, 0)
-			for key, template := range f.grid[r][c] {
-				if Debug {
-					logger.Printf("score grid (%d,%d) %s: pattern: %f, mean: %f, std: %f\n",
-						r, c, key, pattern.grid[r][c][key].mean, f.grid[r][c][key].mean, f.grid[r][c][key].std)
-				}
-				s := stat.StdScore(pattern.grid[r][c][key].mean, template.mean, template.std)
-				ss = append(ss, math.Abs(s))
-			}
-			gss[r][c] = stat.Mean(ss, nil)
+	for area, flag := range AreaFlags {
+		if scoreFunc, ok := f.getScoreFunc(area); flag && ok {
+			score[area] = scoreFunc(f, pattern)
 		}
 	}
-	gRowScores := make([]float64, f.rows)
-	for r, row := range gss {
-		gRowScores[r] = stat.Mean(row, nil)
-	}
-	gridScore := stat.Mean(gRowScores, nil)
 
-	rss := make([]float64, f.rows)
-	for r := range rss {
-		ss := make([]float64, 0)
-		for key, template := range f.row[r] {
-			if Debug {
-				logger.Printf("score row %d %s: pattern: %f, mean: %f, std: %f\n",
-					r, key, pattern.row[r][key].mean, f.row[r][key].mean, f.row[r][key].std)
-			}
-			s := stat.StdScore(pattern.row[r][key].mean, template.mean, template.std)
-			ss = append(ss, math.Abs(s))
-		}
-		rss[r] = stat.Mean(ss, nil)
-	}
-	rowScore := stat.Mean(rss, nil)
-
-	css := make([]float64, f.cols)
-	for c := range css {
-		ss := make([]float64, 0)
-		for key, template := range f.col[c] {
-			if Debug {
-				logger.Printf("score col %d %s: pattern: %f, mean: %f, std: %f\n",
-					c, key, pattern.col[c][key].mean, f.col[c][key].mean, f.col[c][key].std)
-			}
-			s := stat.StdScore(pattern.col[c][key].mean, template.mean, template.std)
-			ss = append(ss, math.Abs(s))
-		}
-		css[c] = stat.Mean(ss, nil)
-	}
-	colScore := stat.Mean(css, nil)
-
-	return &Score{basicScore, gridScore, rowScore, colScore}, pattern
+	return score, pattern
 }
 
 func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	sample.Update()
 
-	var wg sync.WaitGroup
-
 	for _, ftr := range f.basic {
-		wg.Add(1)
-		go func(ftr *Feature) {
-			defer wg.Done()
-			ftr.Update(sample, nSamples)
-		}(ftr)
+		ftr.Update(sample, nSamples)
 	}
 
 	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
-	for r := range f.grid {
-		for c := range f.grid[r] {
-			for _, ftr := range f.grid[r][c] {
-				wg.Add(1)
-				go func(ftr *Feature) {
-					defer wg.Done()
-					ftr.Update(sampleGrid.At(r, c), nSamples)
-				}(ftr)
-			}
+	for rc, ftrMap := range f.grid {
+		for _, ftr := range ftrMap {
+			ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
 		}
 	}
 
-	for r := range f.row {
-		for _, ftr := range f.row[r] {
-			wg.Add(1)
-			go func(ftr *Feature) {
-				defer wg.Done()
-				ftr.Update(sampleGrid.At(r, -1), nSamples)
-			}(ftr)
+	for r, ftrMap := range f.row {
+		for _, ftr := range ftrMap {
+			ftr.Update(sampleGrid.At(r, -1), nSamples)
 		}
 	}
 
-	for c := range f.col {
-		for _, ftr := range f.col[c] {
-			wg.Add(1)
-			go func(ftr *Feature) {
-				defer wg.Done()
-				ftr.Update(sampleGrid.At(-1, c), nSamples)
-			}(ftr)
+	for c, ftrMap := range f.col {
+		for _, ftr := range ftrMap {
+			ftr.Update(sampleGrid.At(-1, c), nSamples)
 		}
 	}
+}
 
-	wg.Wait()
+func (f *Features) Filter(filter func(*Feature) bool) {
+
 }

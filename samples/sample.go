@@ -81,6 +81,10 @@ func (sample *Sample) Ratio() float64 {
 	return sample.ratio
 }
 
+func (sample *Sample) Area() int {
+	return sample.mat.Total()
+}
+
 func (sample *Sample) read(name string) error {
 	mat := gocv.IMRead(name, gocv.IMReadGrayScale)
 	sample.mat = mat
@@ -112,10 +116,8 @@ func (sample *Sample) Preprocess(ratio float64) {
 	if Debug {
 		sample.Save("res", "thinned", false)
 	}
-	sample.toLines()
-	if Debug {
-		sample.Save("res", "lines approximated", false)
-	}
+	//sample.toLines()
+	//if Debug { sample.Save("res", "lines approximated", false) }
 }
 
 func (sample *Sample) Update() {
@@ -300,12 +302,13 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 	return filepath
 }
 
-func (sample *Sample) String() string {
+func (sample *Sample) GoString() string {
 	return fmt.Sprintf(
-		"<Sample %dx%d (%.2f)>",
+		"<Sample %dx%d area %d>",
 		int(sample.width),
 		int(sample.height),
-		sample.ratio)
+		sample.Area(),
+	)
 }
 
 func (sample *Sample) Close() {
@@ -348,6 +351,7 @@ func NewSampleGrid(sample *Sample, rows, cols uint8) *SampleGrid {
 	yStride := uint8(math.Floor(Stride / sample.ratio))
 
 	height, width := calcGridSize(float64(sample.height), float64(sample.width), rows, cols, yStride, xStride)
+	logger.Printf("(%d, %d)\n", width, height)
 	return &SampleGrid{
 		sample:      sample,
 		fieldHeight: height,
@@ -359,7 +363,7 @@ func NewSampleGrid(sample *Sample, rows, cols uint8) *SampleGrid {
 	}
 }
 
-func (sg *SampleGrid) String() string {
+func (sg *SampleGrid) GoString() string {
 	return fmt.Sprintf(
 		"<SampleGrid %dx%d, (%d, %d), [%d/%d]>",
 		sg.rows,

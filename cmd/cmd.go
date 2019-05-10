@@ -34,12 +34,11 @@ func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 }
 
 func EnrollUser(id uint8, samplesIds []int, rows, cols uint8) UserFeatures {
-	template := features.NewFeatures(rows, cols)
-	nSamples := 0
+	template := features.NewFeatures(rows, cols, nil)
 	ok := false
 	var signature *samples.UserSample
 	var err error
-	for _, s := range samplesIds {
+	for i, s := range samplesIds {
 		signature, err = ReadUserSample(id, id, uint8(s))
 		if err != nil {
 			continue
@@ -47,13 +46,13 @@ func EnrollUser(id uint8, samplesIds []int, rows, cols uint8) UserFeatures {
 			ok = true
 		}
 		signature.Preprocess()
-		nSamples++
-		template.Extract(signature.Sample(), nSamples)
+		template.Extract(signature.Sample(), i+1)
 		signature.Close()
 	}
 	if !ok {
 		template = nil
 	}
+	//template.Filter(0.5)
 	return UserFeatures{
 		id,
 		template,
@@ -73,7 +72,7 @@ type VerificationResult struct {
 	RejectedCounts []uint8
 }
 
-func scoreSample(id, i uint8, template *UserFeatures) (*features.Score, error) {
+func scoreSample(id, i uint8, template *UserFeatures) (features.Score, error) {
 	signature, err := ReadUserSample(id, template.Id, i)
 	if err != nil {
 		return nil, err
@@ -88,7 +87,8 @@ func VerifyUser(
 	id uint8,
 	samplesIds []int,
 	template *UserFeatures,
-	thresholds, thresholdWeights []float64,
+	thresholds []float64,
+	thresholdWeights map[features.AreaType]float64,
 ) VerificationResult {
 	successes := make([]uint8, len(thresholds))
 	rejections := make([]uint8, len(thresholds))
@@ -120,7 +120,8 @@ func VerifyUserSync(
 	id uint8,
 	samplesIds []int,
 	template *UserFeatures,
-	thresholds, thresholdWeights []float64,
+	thresholds []float64,
+	thresholdWeights map[features.AreaType]float64,
 	results chan *VerificationResult,
 ) {
 	r := VerifyUser(id, samplesIds, template, thresholds, thresholdWeights)

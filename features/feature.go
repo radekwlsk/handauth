@@ -9,17 +9,75 @@ import (
 	"strings"
 )
 
-type FeatureType int
+type AreaType int
+
+func (t AreaType) String() string {
+	return []string{
+		"BasicArea",
+		"RowArea",
+		"ColArea",
+		"GridArea",
+	}[t]
+}
 
 const (
-	BasicFeaturesType FeatureType = 0
-	RowFeaturesType   FeatureType = 1
-	ColFeaturesType   FeatureType = 2
-	GridFeaturesType  FeatureType = RowFeaturesType + ColFeaturesType
+	BasicAreaType AreaType = iota
+	RowAreaType
+	ColAreaType
+	GridAreaType
 )
 
+type FeatureType int
+
+func (t FeatureType) String() string {
+	return []string{
+		"LengthFeature",
+		"GradientFeature",
+		"AspectFeature",
+	}[t]
+}
+
+const (
+	LengthFeatureType FeatureType = iota
+	GradientFeatureType
+	AspectFeatureType
+)
+
+type FeatureMap map[FeatureType]*Feature
+type GridFeatureMap map[[2]int]FeatureMap
+type RowFeatureMap map[int]FeatureMap
+type ColFeatureMap map[int]FeatureMap
+
+func (m FeatureMap) GoString() string {
+	var ftrStrings []string
+	for _, ftr := range m {
+		ftrStrings = append(ftrStrings, ftr.String())
+	}
+	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
+}
+
+func (m GridFeatureMap) GoString() string {
+	var ftrStrings []string
+	for rc, ftrMap := range m {
+		ftrStrings = append(ftrStrings, fmt.Sprintf("[%d,%d] %#v", rc[0], rc[1], ftrMap))
+	}
+	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
+}
+
+func NewLengthFeature() *Feature {
+	return &Feature{fType: LengthFeatureType, function: length}
+}
+
+func NewGradientFeature() *Feature {
+	return &Feature{fType: GradientFeatureType, function: gradient}
+}
+
+func NewAspectFeature() *Feature {
+	return &Feature{fType: AspectFeatureType, function: aspect}
+}
+
 type Feature struct {
-	name     string
+	fType    FeatureType
 	std      float64
 	mean     float64
 	variance float64
@@ -28,38 +86,32 @@ type Feature struct {
 	function func(sample *samples.Sample) float64
 }
 
-type FeatureMap = map[string]*Feature
-
-func NewFeature(name string, function func(sample *samples.Sample) float64) *Feature {
-	return &Feature{name: name, function: function}
-}
-
 func (f *Feature) String() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("<Feature %s: %.3f", f.name, f.mean))
+	sb.WriteString(fmt.Sprintf("%s %.3f", f.fType, f.mean))
 	if f.min != f.max {
 		sb.WriteString(fmt.Sprintf(" [%.3f, %.3f]", f.min, f.max))
 	}
 	if f.variance != 0 {
 		sb.WriteString(fmt.Sprintf(", var %.3f(%.3f)", f.variance, f.std))
 	}
-	sb.WriteString(">")
 	return sb.String()
-}
-
-func (f *Feature) Name() string {
-	return f.name
 }
 
 func (f *Feature) Update(sample *samples.Sample, nSamples int) {
 	value := f.function(sample)
-	if nSamples == 1 {
+
+	switch nSamples {
+	case 0:
+		panic("nSamples has to be at least 1 - for first sample enroll")
+	case 1:
 		f.mean = value
 		f.min = value
 		f.max = value
 		f.variance = 0.0
 		f.std = 0.0
-	} else {
+		break
+	default:
 		newMean := stat.Mean([]float64{f.mean, value}, []float64{float64(nSamples - 1), 1})
 		newVar := f.variance + (math.Pow(value-f.mean, 2) / float64(nSamples))
 		newVar *= float64(nSamples-1) / float64(nSamples)
@@ -75,6 +127,14 @@ func (f *Feature) Update(sample *samples.Sample, nSamples int) {
 			f.min = value
 		}
 	}
+}
+
+func (f *Feature) Value() float64 {
+	return f.mean
+}
+
+func (f *Feature) Score(other *Feature) float64 {
+	return stat.StdScore(other.Value(), f.mean, f.std)
 }
 
 func aspect(sample *samples.Sample) float64 {

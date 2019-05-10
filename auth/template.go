@@ -13,8 +13,8 @@ type Template struct {
 	gridStride        float64
 	gridSize          [2]float64
 	features          *features.Features
-	featuresEnabled   map[features.FeatureType]bool
-	featuresAvailable map[features.FeatureType]bool
+	featuresEnabled   map[features.AreaType]bool
+	featuresAvailable map[features.AreaType]bool
 }
 
 func NewTemplate(
