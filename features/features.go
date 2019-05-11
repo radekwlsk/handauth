@@ -27,15 +27,16 @@ var FeatureFlags = map[FeatureType]bool{
 }
 
 type Features struct {
-	basic FeatureMap
-	grid  GridFeatureMap
-	row   RowFeatureMap
-	col   ColFeatureMap
-	rows  uint8
-	cols  uint8
+	basic      FeatureMap
+	grid       GridFeatureMap
+	row        RowFeatureMap
+	col        ColFeatureMap
+	rows       uint16
+	cols       uint16
+	gridConfig samples.GridConfig
 }
 
-func NewFeatures(rows, cols uint8, template *Features) *Features {
+func NewFeatures(rows, cols uint16, template *Features) *Features {
 	var rowKeys, colKeys []int
 	var gridKeys [][2]int
 	if template == nil {
@@ -66,7 +67,7 @@ func NewFeatures(rows, cols uint8, template *Features) *Features {
 	return newFeatures(rows, cols, rowKeys, colKeys, gridKeys)
 }
 
-func newFeatures(rows, cols uint8, rowKeys, colKeys []int, gridKeys [][2]int) *Features {
+func newFeatures(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Features {
 	var basic FeatureMap
 	var grid GridFeatureMap
 	var row RowFeatureMap
@@ -118,7 +119,21 @@ func (f *Features) GoString() string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("\t%#v\n", f.basic))
 	sb.WriteString(fmt.Sprintf("\t%#v\n", f.grid))
+	sb.WriteString(fmt.Sprintf("\t%#v\n", f.row))
+	sb.WriteString(fmt.Sprintf("\t%#v\n", f.col))
 	return fmt.Sprintf("<%T \n%s>", f, sb.String())
+}
+
+func (f *Features) FieldsCount() int {
+	return len(f.grid)
+}
+
+func (f *Features) RowsCount() int {
+	return len(f.row)
+}
+
+func (f *Features) ColsCount() int {
+	return len(f.col)
 }
 
 type Score map[AreaType]float64
@@ -242,6 +257,7 @@ func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	}
 
 	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
+	f.gridConfig = sampleGrid.Config()
 	for rc, ftrMap := range f.grid {
 		for _, ftr := range ftrMap {
 			ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
@@ -261,6 +277,34 @@ func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	}
 }
 
-func (f *Features) Filter(filter func(*Feature) bool) {
+func (f *Features) AreaFilter(fieldThreshold float64, rowColThreshold float64) error {
+	if f.gridConfig == (samples.GridConfig{}) {
+		return fmt.Errorf("at least one sample has to be extracted before filtering")
+	}
 
+	fieldAreaLimit := f.gridConfig.FieldArea() * fieldThreshold
+	rowAreaLimit := f.gridConfig.RowArea() * rowColThreshold
+	colAreaLimit := f.gridConfig.ColArea() * rowColThreshold
+
+	for rc, ftrMap := range f.grid {
+		lnFtr := ftrMap[LengthFeatureType]
+		if lnFtr.mean < fieldAreaLimit {
+			delete(f.grid, rc)
+		}
+	}
+
+	for r, ftrMap := range f.row {
+		lnFtr := ftrMap[LengthFeatureType]
+		if lnFtr.mean < rowAreaLimit {
+			delete(f.row, r)
+		}
+	}
+
+	for c, ftrMap := range f.col {
+		lnFtr := ftrMap[LengthFeatureType]
+		if lnFtr.mean < colAreaLimit {
+			delete(f.col, c)
+		}
+	}
+	return nil
 }

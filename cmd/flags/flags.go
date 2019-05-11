@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	ColsDefault                = 10
-	RowsDefault                = 4
+	ColsDefault                = 60
+	RowsDefault                = 20
 	MinThresholdDefault        = 1.0
 	MaxThresholdDefault        = 3.0
 	ThresholdStepDefault       = 0.1
@@ -17,6 +17,8 @@ const (
 	GridThresholdScaleDefault  = 1.0
 	RowThresholdScaleDefault   = 1.0
 	ColThresholdScaleDefault   = 1.0
+	FieldAreaThresholdDefault  = 0.07
+	RowColAreaThresholdDefault = 0.03
 )
 
 var (
@@ -35,6 +37,10 @@ var (
 		"test threshold scale for row score")
 	colThresholdScale = flag.Float64("col-scale", ColThresholdScaleDefault,
 		"test threshold scale for col score")
+	FieldAreaThreshold = flag.Float64("filter-area-field", FieldAreaThresholdDefault,
+		"area filter field threshold")
+	RowColAreaThreshold = flag.Float64("filter-area-rowcol", RowColAreaThresholdDefault,
+		"area filter row/col threshold")
 )
 
 func Thresholds() []float64 {

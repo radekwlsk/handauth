@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/radekwlsk/handauth/cmd/flags"
 	"github.com/radekwlsk/handauth/features"
 	"github.com/radekwlsk/handauth/samples"
 	"path"
@@ -33,7 +34,7 @@ func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 	}
 }
 
-func EnrollUser(id uint8, samplesIds []int, rows, cols uint8) UserFeatures {
+func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) UserFeatures {
 	template := features.NewFeatures(rows, cols, nil)
 	ok := false
 	var signature *samples.UserSample
@@ -51,15 +52,16 @@ func EnrollUser(id uint8, samplesIds []int, rows, cols uint8) UserFeatures {
 	}
 	if !ok {
 		template = nil
+	} else {
+		_ = template.AreaFilter(*flags.FieldAreaThreshold, *flags.RowColAreaThreshold)
 	}
-	//template.Filter(0.5)
 	return UserFeatures{
 		id,
 		template,
 	}
 }
 
-func EnrollUserSync(id uint8, samplesIds []int, rows, cols uint8, users chan *UserFeatures) {
+func EnrollUserSync(id uint8, samplesIds []int, rows, cols uint16, users chan *UserFeatures) {
 	uf := EnrollUser(id, samplesIds, rows, cols)
 	users <- &uf
 	return

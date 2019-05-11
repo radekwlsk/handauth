@@ -64,6 +64,22 @@ func (m GridFeatureMap) GoString() string {
 	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
 }
 
+func (m RowFeatureMap) GoString() string {
+	var ftrStrings []string
+	for r, ftrMap := range m {
+		ftrStrings = append(ftrStrings, fmt.Sprintf("[%d] %#v", r, ftrMap))
+	}
+	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
+}
+
+func (m ColFeatureMap) GoString() string {
+	var ftrStrings []string
+	for c, ftrMap := range m {
+		ftrStrings = append(ftrStrings, fmt.Sprintf("[%d] %#v", c, ftrMap))
+	}
+	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
+}
+
 func NewLengthFeature() *Feature {
 	return &Feature{fType: LengthFeatureType, function: length}
 }
@@ -146,6 +162,9 @@ func length(sample *samples.Sample) float64 {
 }
 
 func gradient(sample *samples.Sample) float64 {
+	if sample.Empty() {
+		panic(fmt.Sprintf("empty mat in %#v", sample))
+	}
 	sobelX := gocv.NewMat()
 	sobelY := gocv.NewMat()
 	gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)

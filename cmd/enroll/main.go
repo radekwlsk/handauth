@@ -18,15 +18,24 @@ func main() {
 	samples.Debug = debug
 	features.Debug = debug
 
-	us, err := cmd.ReadUserSample(1, 1, 1)
+	us, err := cmd.ReadUserSample(16, 16, 5)
 	if err != nil {
 		panic(err)
 	}
 	us.Preprocess()
-	//sg := samples.NewSampleGrid(us.Sample(), uint8(*flags.Rows), uint8(*flags.Cols))
+	sg := samples.NewSampleGrid(us.Sample(), uint16(*flags.Rows), uint16(*flags.Cols))
 	//sg.Save("res", "grid", false)
+	fmt.Printf("%#v\n", sg)
 
-	template := features.NewFeatures(uint8(*flags.Rows), uint8(*flags.Cols), nil)
+	template := features.NewFeatures(uint16(*flags.Rows), uint16(*flags.Cols), nil)
 	template.Extract(us.Sample(), 1)
-	fmt.Println(template.GoString())
+	fmt.Println("BEFORE")
+	fmt.Println(template.FieldsCount())
+	fmt.Println(template.RowsCount())
+	fmt.Println(template.ColsCount())
+	_ = template.AreaFilter(*flags.FieldAreaThreshold, *flags.RowColAreaThreshold)
+	fmt.Println("AFTER")
+	fmt.Println(template.FieldsCount())
+	fmt.Println(template.RowsCount())
+	fmt.Println(template.ColsCount())
 }

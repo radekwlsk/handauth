@@ -9,7 +9,9 @@ import (
 
 const SplitDefault = 7
 
-var split int
+var (
+	split int
+)
 
 func main() {
 	flag.IntVar(&split, "split", SplitDefault, "enroll/test data split point")
@@ -51,7 +53,7 @@ func main() {
 	featuresChan := make(chan *cmd.UserFeatures)
 
 	for i := 1; i <= 100; i++ {
-		go cmd.EnrollUserSync(uint8(i), enrollSamplesIds, uint8(*flags.Rows), uint8(*flags.Cols), featuresChan)
+		go cmd.EnrollUserSync(uint8(i), enrollSamplesIds, uint16(*flags.Rows), uint16(*flags.Cols), featuresChan)
 	}
 
 	for i := 1; i <= 100; i++ {
