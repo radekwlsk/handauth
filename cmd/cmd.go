@@ -8,9 +8,13 @@ import (
 	"path"
 )
 
-const ResourcesGenuinePath = "/home/radoslaw/pwr/mgr/thesis/sig_cv/res/NISDCC-offline/genuines/"
-const ResourcesForgeryPath = "/home/radoslaw/pwr/mgr/thesis/sig_cv/res/NISDCC-offline/forgeries/"
+const ResourcesFullGenuinePath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/genuines/full/"
+const ResourcesTestGenuinePath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/genuines/test/"
+const ResourcesFullForgeryPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/forgeries/full/"
+const ResourcesTestForgeryPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/forgeries/test/"
 const FileNameFormat = "NFI-%03d%02d%03d.png"
+
+var UseFullResources = true
 
 type UserFeatures struct {
 	Id       uint8
@@ -20,9 +24,17 @@ type UserFeatures struct {
 func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 	var resPath string
 	if creator == user {
-		resPath = ResourcesGenuinePath
+		if UseFullResources {
+			resPath = ResourcesFullGenuinePath
+		} else {
+			resPath = ResourcesTestGenuinePath
+		}
 	} else {
-		resPath = ResourcesForgeryPath
+		if UseFullResources {
+			resPath = ResourcesFullForgeryPath
+		} else {
+			resPath = ResourcesTestForgeryPath
+		}
 	}
 	filePath := path.Join(resPath, fmt.Sprintf(FileNameFormat, creator, index, user))
 	userName := fmt.Sprintf("%02d", user)
