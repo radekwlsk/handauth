@@ -33,7 +33,7 @@ type Sample struct {
 
 func NewSample(filename string) (*Sample, error) {
 	s := &Sample{
-		mat:    gocv.NewMat(),
+		mat:    gocv.Mat{},
 		height: 0,
 		width:  0,
 		ratio:  0.0,
@@ -86,8 +86,7 @@ func (sample *Sample) Area() int {
 }
 
 func (sample *Sample) read(name string) error {
-	mat := gocv.IMRead(name, gocv.IMReadGrayScale)
-	sample.mat = mat
+	sample.mat = gocv.IMRead(name, gocv.IMReadGrayScale)
 	if sample.mat.Empty() {
 		return fmt.Errorf("failed to read sample: %s", name)
 	}
@@ -141,8 +140,7 @@ func (sample *Sample) normalize() {
 	gocv.LUT(sample.mat, lookup, &dst)
 
 	_ = sample.mat.Close()
-	sample.mat = dst.Clone()
-	_ = dst.Close()
+	sample.mat = dst
 }
 
 func (sample *Sample) foreground() {
@@ -152,12 +150,12 @@ func (sample *Sample) foreground() {
 	gocv.Threshold(sample.mat, &dst, 0.0, 255.0, gocv.ThresholdBinaryInv+gocv.ThresholdOtsu)
 
 	_ = sample.mat.Close()
-	sample.mat = dst.Clone()
-	_ = dst.Close()
+	sample.mat = dst
 }
 
 func (sample *Sample) toLines() {
 	matLines := gocv.NewMat()
+	defer matLines.Close()
 	dst := gocv.NewMatWithSize(sample.Height(), sample.Width(), 0)
 
 	gocv.HoughLinesPWithParams(
@@ -176,46 +174,18 @@ func (sample *Sample) toLines() {
 		gocv.Line(&dst, pt1, pt2, color.RGBA{255, 255, 255, 0}, 1)
 	}
 
-	_ = matLines.Close()
 	_ = sample.mat.Close()
-	sample.mat = dst.Clone()
-	_ = dst.Close()
+	sample.mat = dst
 }
 
 func (sample *Sample) zhangSuen() {
-	s1Flag := true
-	s2Flag := true
-	for s1Flag || s2Flag {
-		s1Marks := make([][2]int, 0)
-		for r := 0; r < sample.Height(); r++ {
-			for c := 0; c < sample.Width(); c++ {
-				if Step1ConditionsMet(sample, r, c) {
-					s1Marks = append(s1Marks, [2]int{r, c})
-				}
-			}
-		}
-		s1Flag = len(s1Marks) > 0
-		if s1Flag {
-			for _, rc := range s1Marks {
-				sample.mat.SetUCharAt(rc[0], rc[1], 0)
-			}
-		}
+	defer sample.Update()
+	dst := gocv.NewMat()
 
-		s2Marks := make([][2]int, 0)
-		for r := 0; r < sample.Height(); r++ {
-			for c := 0; c < sample.Width(); c++ {
-				if Step2ConditionsMet(sample, r, c) {
-					s2Marks = append(s2Marks, [2]int{r, c})
-				}
-			}
-		}
-		s2Flag = len(s2Marks) > 0
-		if s2Flag {
-			for _, rc := range s2Marks {
-				sample.mat.SetUCharAt(rc[0], rc[1], 0)
-			}
-		}
-	}
+	ZhangSuen(sample.mat, &dst)
+
+	_ = sample.mat.Close()
+	sample.mat = dst
 }
 
 func (sample *Sample) crop() {
@@ -230,8 +200,7 @@ func (sample *Sample) crop() {
 	dst = sample.mat.Region(rect)
 
 	_ = sample.mat.Close()
-	sample.mat = dst.Clone()
-	_ = dst.Close()
+	sample.mat = dst
 }
 
 func (sample *Sample) Resize(width int, ratio float64) {
@@ -249,26 +218,7 @@ func (sample *Sample) Resize(width int, ratio float64) {
 	gocv.Resize(sample.mat, &dst, point, 0.0, 0.0, gocv.InterpolationNearestNeighbor)
 
 	_ = sample.mat.Close()
-	sample.mat = dst.Clone()
-	_ = dst.Close()
-}
-
-func (sample *Sample) ColorModel() color.Model {
-	switch sample.MatType() {
-	case gocv.MatTypeCV8UC3:
-		return color.RGBAModel
-	default:
-		return color.GrayModel
-	}
-}
-
-func (sample *Sample) Bounds() image.Rectangle {
-	return image.Rect(0, 0, sample.mat.Cols()-1, sample.mat.Rows()-1)
-}
-
-func (sample *Sample) At(x, y int) color.Color {
-	c := sample.mat.GetUCharAt(y, x)
-	return color.RGBA{c, c, c, 0}
+	sample.mat = dst
 }
 
 func (sample *Sample) Save(dir, filename string, show bool) string {
@@ -278,7 +228,11 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 	if err != nil {
 		log.Println(err)
 	}
-	if err := png.Encode(f, sample); err != nil {
+	img, err := sample.mat.ToImage()
+	if err != nil {
+		log.Println(err)
+	}
+	if err := png.Encode(f, img); err != nil {
 		_ = f.Close()
 		log.Println(err)
 	}
@@ -295,7 +249,6 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 			err := cmd.Run()
 			if err != nil {
 				log.Fatal(err)
-
 			}
 		}()
 	}
@@ -335,23 +288,12 @@ func (gc GridConfig) GoString() string {
 
 func calcOverlappingGridSize(height, width float64, rows, cols uint16) (h, w, ys, xs uint16) {
 	w = uint16(math.Floor((10 * width) / (float64(3*cols) + 7)))
-	//xs = uint16(Stride)
 	xs = uint16(math.Floor(0.3 * float64(w)))
 	if float64(xs*(cols-1)) > width {
 		panic(fmt.Sprintf("decrease number of columns or stride value"))
 	}
-	//w = uint16(math.Ceil(width - (float64(xs)*float64(cols-1))))
-	//ys = uint16(math.Ceil(float64(xs) * float64(height)/float64(width)))
-	//h = uint16(math.Ceil(float64(w)*float64(height)/float64(width)))
-	//ys = uint16(math.Ceil((height-() / float64(rows-1)))
-	//ys = uint16(math.Floor((height-float64(h)) / float64(rows-1)))
-	//ys = uint16(math.Floor(0.3 * float64(h)))
 	h = uint16(math.Floor((10 * height) / (float64(3*rows) + 7)))
 	ys = uint16(math.Floor(0.3 * float64(h)))
-	//if float64(ys * (rows-1)) > height {
-	//	panic(fmt.Sprintf("decrease number of rows or stride value"))
-	//}
-	//h = uint16(math.Ceil(height - float64(ys)*float64(rows-1)))
 	if h <= 5 {
 		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
 	}

@@ -171,6 +171,8 @@ func gradient(sample *samples.Sample) float64 {
 	}
 	sobelX := gocv.NewMat()
 	sobelY := gocv.NewMat()
+	defer sobelX.Close()
+	defer sobelY.Close()
 	gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)
 	gradX := gocv.CountNonZero(sobelX)
 	gradY := gocv.CountNonZero(sobelY)
@@ -180,3 +182,29 @@ func gradient(sample *samples.Sample) float64 {
 		return 0.0
 	}
 }
+
+//
+//func histogramOfGradients(sample *samples.Sample) float64 {
+//	if sample.Empty() {
+//		panic(fmt.Sprintf("empty mat in %#v", sample))
+//	}
+//	sobelX := gocv.NewMat()
+//	sobelY := gocv.NewMat()
+//	defer sobelX.Close()
+//	defer sobelY.Close()
+//	gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)
+//	magnitude := gocv.NewMat()
+//	angle := gocv.NewMat()
+//	defer magnitude.Close()
+//	defer angle.Close()
+//	gocv.CartToPolar(sobelX, sobelY, &magnitude, &angle, true)
+//	bins := map[int]float64{0: .0, 20: .0, 40: .0, 60: .0, 80: .0, 100: .0, 120: .0, 140: .0, 160: .0}
+//	for r := 0; r < angle.Rows(); r++ {
+//		for c := 0; c < angle.Cols(); c++ {
+//
+//		}
+//	}
+//
+//
+//	return float64(gocv.CountNonZero(sample.Mat()))
+//}
