@@ -1,12 +1,15 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"github.com/radekwlsk/handauth/cmd"
 	"github.com/radekwlsk/handauth/cmd/flags"
 	"io/ioutil"
+	"log"
 	"math"
+	"os"
 	"strconv"
 	"time"
 )
@@ -14,41 +17,55 @@ import (
 const SplitDefault = 0.5
 
 var (
-	split float64
+	split         float64
 	fullResources bool
-	start time.Time
+	start         time.Time
+	outFileName   string
+	outWriter     *csv.Writer
 )
 
 func main() {
 	flag.Float64Var(&split, "split", SplitDefault, "enroll/test data split ratio")
 	flag.BoolVar(&fullResources, "full", false, "run test on full dataset")
+	flag.StringVar(&outFileName, "o", "out.csv", "output file")
 	flag.Parse()
 	cmd.UseFullResources = fullResources
-	
-	thresholdWeights := flags.ThresholdWeights()
 
-	fmt.Printf(
-		"%d\tcols\n"+
-			"%d\trows\n"+
-			"%.2f\textract/verify split\n"+
-			"%v\tthreshold-weights\n",
-		*flags.Cols,
-		*flags.Rows,
-		split,
-		thresholdWeights,
-	)
-
-	thresholds := flags.Thresholds()
 	if flags.Verbose() {
-		fmt.Printf("%v\tthresholds\n", thresholds)
+		log.Println("Starting")
 	}
-	if flags.Verbose() {
-		if fullResources {
-			fmt.Print("Full test - ")
+
+	{
+		file, err := os.Create(outFileName)
+		if err != nil {
+			panic("can't create output file")
 		}
-		fmt.Println("Started")
+		defer file.Close()
+
+		outWriter = csv.NewWriter(file)
+		defer outWriter.Flush()
 	}
-	
+
+	thresholdWeights := flags.ThresholdWeights()
+	thresholds := flags.Thresholds()
+
+	{
+		config := [][]string{
+			{"full data", fmt.Sprintf("%v", fullResources)},
+			{"cols", fmt.Sprintf("%d", *flags.Cols)},
+			{"rows", fmt.Sprintf("%d", *flags.Rows)},
+			{"split", fmt.Sprintf("%.2f", split)},
+			{"field area filter", fmt.Sprintf("%.3f", *flags.AreaFilterFieldThreshold)},
+			{"row/col area filter", fmt.Sprintf("%.3f", *flags.AreaFilterRowColThreshold)},
+			{"std-mean filter", fmt.Sprintf("%.3f", *flags.StdMeanFilterThreshold)},
+		}
+		for a, w := range thresholdWeights {
+			config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
+		}
+		_ = outWriter.WriteAll(config)
+		outWriter.Flush()
+	}
+
 	genuineSamplesUsers := make(map[int][]int)
 	forgerySamplesUsers := make(map[[2]int][]int)
 	{
@@ -112,50 +129,54 @@ func main() {
 			}
 		}
 	}
-	
+
 	users := map[uint8]*cmd.UserFeatures{}
 	{
-		if flags.Verbose() { start = time.Now() }
+		if flags.Verbose() {
+			start = time.Now()
+		}
 		featuresChan := make(chan *cmd.UserFeatures)
-	
+
 		for user, samples := range genuineSamplesUsers {
 			enrollSplit := math.Ceil(float64(len(samples)) * split)
 			enrollSamples := samples[:int(enrollSplit)]
 			go cmd.EnrollUserSync(uint8(user), enrollSamples, uint16(*flags.Rows), uint16(*flags.Cols), featuresChan)
 		}
-	
+
 		for range genuineSamplesUsers {
 			f := <-featuresChan
 			if f.Features != nil {
 				users[f.Id] = f
 				if *flags.VVerbose {
-					fmt.Printf("\tEnrolled user %03d\n", f.Id)
+					log.Printf("\tEnrolled user %03d\n", f.Id)
 				}
 			}
 		}
-	
+
 		close(featuresChan)
 		if flags.Verbose() {
-			fmt.Printf("Enrolled %d users in %s\n", len(users), time.Since(start))
+			log.Printf("Enrolled %d users in %s\n", len(users), time.Since(start))
 		}
 	}
-	
+
 	genuineResultsChan := make(chan *cmd.VerificationResult)
 	genuineStats := cmd.VerificationStat{
 		PositiveCounts: map[float64]uint16{},
 		NegativeCounts: map[float64]uint16{},
 	}
-	
+
 	{
-		if flags.Verbose() { start = time.Now() }
-		
+		if flags.Verbose() {
+			start = time.Now()
+		}
+
 		for id, user := range users {
 			samples := genuineSamplesUsers[int(id)]
 			verifySplit := math.Ceil(float64(len(samples)) * split)
 			verifySamples := samples[int(verifySplit):]
 			go cmd.VerifyUserSync(id, verifySamples, user, thresholds, thresholdWeights, genuineResultsChan)
 		}
-	
+
 		for range users {
 			r := <-genuineResultsChan
 			for i, t := range thresholds {
@@ -173,9 +194,9 @@ func main() {
 				}
 			}
 			if *flags.VVerbose {
-				fmt.Printf("\tVerified user %03d\n", r.TemplateUserId)
+				log.Printf("\tVerified user %03d\n", r.TemplateUserId)
 				for i, t := range thresholds {
-					fmt.Printf(
+					log.Printf(
 						"\t\t%.2f: %d/%d\n",
 						t,
 						r.SuccessCounts[i],
@@ -186,19 +207,21 @@ func main() {
 		}
 		close(genuineResultsChan)
 		if flags.Verbose() {
-			fmt.Printf("Verified all genuine users in %s\n", time.Since(start))
+			log.Printf("Verified all genuine users in %s\n", time.Since(start))
 		}
 	}
-	
+
 	forgeriesResultsChan := make(chan *cmd.VerificationResult)
 	forgeriesStats := cmd.VerificationStat{
 		PositiveCounts: map[float64]uint16{},
 		NegativeCounts: map[float64]uint16{},
 	}
-	
+
 	{
-		if flags.Verbose() { start = time.Now() }
-		
+		if flags.Verbose() {
+			start = time.Now()
+		}
+
 		for forgerUser, samples := range forgerySamplesUsers {
 			go cmd.VerifyUserSync(
 				uint8(forgerUser[0]),
@@ -209,7 +232,7 @@ func main() {
 				forgeriesResultsChan,
 			)
 		}
-	
+
 		for range forgerySamplesUsers {
 			r := <-forgeriesResultsChan
 			for i, t := range thresholds {
@@ -227,13 +250,13 @@ func main() {
 				}
 			}
 			if *flags.VVerbose {
-				fmt.Printf(
+				log.Printf(
 					"\tVerified user %03d as %03d\n",
 					r.SampleUserId,
 					r.TemplateUserId,
 				)
 				for i, t := range thresholds {
-					fmt.Printf(
+					log.Printf(
 						"\t\t%.2f: %d/%d\n",
 						t,
 						r.SuccessCounts[i],
@@ -244,17 +267,15 @@ func main() {
 		}
 		close(forgeriesResultsChan)
 		if flags.Verbose() {
-			fmt.Printf("Verified all forgeries in %s\n", time.Since(start))
+			log.Printf("Verified all forgeries in %s\n", time.Since(start))
 		}
 	}
-	
-	fmt.Printf("THR:\tFRR:\tFAR:\n")
+	_ = outWriter.Write([]string{"threshold", "frr", "far"})
 	for _, t := range thresholds {
-		fmt.Printf(
-			"%.2f\t%.3f\t%.3f\n",
-			t,
-			genuineStats.RejectionRate(t),
-			forgeriesStats.AcceptanceRate(t),
-		)
+		_ = outWriter.Write([]string{
+			fmt.Sprintf("%.2f", t),
+			fmt.Sprintf("%.4f", genuineStats.RejectionRate(t)),
+			fmt.Sprintf("%.4f", forgeriesStats.AcceptanceRate(t)),
+		})
 	}
 }

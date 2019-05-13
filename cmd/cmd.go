@@ -65,7 +65,8 @@ func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) UserFeatures {
 	if !ok {
 		template = nil
 	} else {
-		_ = template.AreaFilter(*flags.FieldAreaThreshold, *flags.RowColAreaThreshold)
+		_ = template.AreaFilter(*flags.AreaFilterFieldThreshold, *flags.AreaFilterRowColThreshold)
+		_ = template.StdMeanFilter(*flags.StdMeanFilterThreshold)
 	}
 	return UserFeatures{
 		id,

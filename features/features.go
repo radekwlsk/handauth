@@ -308,3 +308,37 @@ func (f *Features) AreaFilter(fieldThreshold float64, rowColThreshold float64) e
 	}
 	return nil
 }
+
+func (f *Features) StdMeanFilter(threshold float64) error {
+	if f.gridConfig == (samples.GridConfig{}) {
+		return fmt.Errorf("at least one sample has to be extracted before filtering")
+	}
+
+	for rc, ftrMap := range f.grid {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] && ftr.std > ftr.mean*threshold {
+				delete(f.grid, rc)
+				break
+			}
+		}
+	}
+
+	for r, ftrMap := range f.row {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] && ftr.std > ftr.mean*threshold {
+				delete(f.row, r)
+				break
+			}
+		}
+	}
+
+	for c, ftrMap := range f.col {
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] && ftr.std > ftr.mean*threshold {
+				delete(f.col, c)
+				break
+			}
+		}
+	}
+	return nil
+}

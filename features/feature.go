@@ -149,6 +149,10 @@ func (f *Feature) Value() float64 {
 	return f.mean
 }
 
+func (f *Feature) Std() float64 {
+	return f.std
+}
+
 func (f *Feature) Score(other *Feature) float64 {
 	return stat.StdScore(other.Value(), f.mean, f.std)
 }

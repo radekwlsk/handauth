@@ -8,17 +8,18 @@ import (
 )
 
 const (
-	ColsDefault                = 60
-	RowsDefault                = 20
-	MinThresholdDefault        = 1.0
-	MaxThresholdDefault        = 3.0
-	ThresholdStepDefault       = 0.1
-	BasicThresholdScaleDefault = 1.0
-	GridThresholdScaleDefault  = 1.0
-	RowThresholdScaleDefault   = 1.0
-	ColThresholdScaleDefault   = 1.0
-	FieldAreaThresholdDefault  = 0.07
-	RowColAreaThresholdDefault = 0.03
+	ColsDefault                      = 60
+	RowsDefault                      = 20
+	MinThresholdDefault              = 1.0
+	MaxThresholdDefault              = 3.0
+	ThresholdStepDefault             = 0.05
+	BasicThresholdScaleDefault       = 1.0
+	GridThresholdScaleDefault        = 1.0
+	RowThresholdScaleDefault         = 1.0
+	ColThresholdScaleDefault         = 1.0
+	AreaFilterFieldThresholdDefault  = 0.05
+	AreaFilterRowColThresholdDefault = 0.02
+	StdMeanFilterThresholdDefault    = 0.5
 )
 
 var (
@@ -37,10 +38,12 @@ var (
 		"test threshold scale for row score")
 	colThresholdScale = flag.Float64("col-scale", ColThresholdScaleDefault,
 		"test threshold scale for col score")
-	FieldAreaThreshold = flag.Float64("filter-area-field", FieldAreaThresholdDefault,
-		"area filter field threshold")
-	RowColAreaThreshold = flag.Float64("filter-area-rowcol", RowColAreaThresholdDefault,
-		"area filter row/col threshold")
+	AreaFilterFieldThreshold = flag.Float64("filter-area-field", AreaFilterFieldThresholdDefault,
+		"area filter field min threshold")
+	AreaFilterRowColThreshold = flag.Float64("filter-area-rowcol", AreaFilterRowColThresholdDefault,
+		"area filter row/col min threshold")
+	StdMeanFilterThreshold = flag.Float64("filter-std", StdMeanFilterThresholdDefault,
+		"std-mean filter max threshold")
 )
 
 func Thresholds() []float64 {
