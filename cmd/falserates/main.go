@@ -26,12 +26,14 @@ var (
 	outFileName   string
 	outWriter     *csv.Writer
 	workingDir    string
+	testMessage   string
 )
 
 func main() {
 	flag.Float64Var(&split, "split", SplitDefault, "enroll/test data split ratio")
 	flag.BoolVar(&fullResources, "full", false, "run test on full dataset")
 	flag.StringVar(&outFileName, "o", "out.csv", "output file")
+	flag.StringVar(&testMessage, "m", "", "message to be associated with a test")
 	flag.Parse()
 	cmd.UseFullResources = fullResources
 
@@ -71,6 +73,7 @@ func main() {
 			{"field area filter", fmt.Sprintf("%.3f", *flags.AreaFilterFieldThreshold)},
 			{"row/col area filter", fmt.Sprintf("%.3f", *flags.AreaFilterRowColThreshold)},
 			{"std-mean filter", fmt.Sprintf("%.3f", *flags.StdMeanFilterThreshold)},
+			{"message", testMessage},
 		}
 		for a, w := range thresholdWeights {
 			config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
