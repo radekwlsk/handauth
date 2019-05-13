@@ -10,7 +10,10 @@ import (
 	"log"
 	"math"
 	"os"
+	"path"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -22,6 +25,7 @@ var (
 	start         time.Time
 	outFileName   string
 	outWriter     *csv.Writer
+	workingDir    string
 )
 
 func main() {
@@ -36,9 +40,10 @@ func main() {
 	}
 
 	{
-		file, err := os.Create(outFileName)
+		workingDir, _ = os.Getwd()
+		file, err := os.Create(path.Join(workingDir, "res", outFileName))
 		if err != nil {
-			panic("can't create output file")
+			panic(err)
 		}
 		defer file.Close()
 
@@ -50,6 +55,14 @@ func main() {
 	thresholds := flags.Thresholds()
 
 	{
+		ext := filepath.Ext(outFileName)
+		configFileName := strings.TrimSuffix(outFileName, ext) + "_config" + ext
+		file, err := os.Create(path.Join(workingDir, "res", configFileName))
+		if err != nil {
+			panic(err)
+		}
+
+		configWriter := csv.NewWriter(file)
 		config := [][]string{
 			{"full data", fmt.Sprintf("%v", fullResources)},
 			{"cols", fmt.Sprintf("%d", *flags.Cols)},
@@ -62,8 +75,9 @@ func main() {
 		for a, w := range thresholdWeights {
 			config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
 		}
-		_ = outWriter.WriteAll(config)
-		outWriter.Flush()
+		_ = configWriter.WriteAll(config)
+		configWriter.Flush()
+		_ = file.Close()
 	}
 
 	genuineSamplesUsers := make(map[int][]int)
