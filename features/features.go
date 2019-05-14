@@ -24,6 +24,7 @@ var FeatureFlags = map[FeatureType]bool{
 	LengthFeatureType:   true,
 	GradientFeatureType: true,
 	AspectFeatureType:   true,
+	HOGFeatureType:      true,
 }
 
 type Features struct {
@@ -77,6 +78,7 @@ func newFeatures(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *
 		basic = FeatureMap{
 			LengthFeatureType:   NewLengthFeature(),
 			GradientFeatureType: NewGradientFeature(),
+			HOGFeatureType:      NewHOGFeature(),
 			AspectFeatureType:   NewAspectFeature(),
 		}
 	}
@@ -85,6 +87,7 @@ func newFeatures(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *
 		for _, rc := range gridKeys {
 			grid[rc] = FeatureMap{
 				LengthFeatureType:   NewLengthFeature(),
+				HOGFeatureType:      NewHOGFeature(),
 				GradientFeatureType: NewGradientFeature(),
 			}
 		}
@@ -93,7 +96,9 @@ func newFeatures(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *
 		row = make(RowFeatureMap)
 		for _, r := range rowKeys {
 			row[r] = FeatureMap{
-				LengthFeatureType: NewLengthFeature(),
+				LengthFeatureType:   NewLengthFeature(),
+				HOGFeatureType:      NewHOGFeature(),
+				GradientFeatureType: NewGradientFeature(),
 			}
 		}
 	}
@@ -101,7 +106,9 @@ func newFeatures(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *
 		col = make(ColFeatureMap)
 		for _, c := range colKeys {
 			col[c] = FeatureMap{
-				LengthFeatureType: NewLengthFeature(),
+				LengthFeatureType:   NewLengthFeature(),
+				HOGFeatureType:      NewHOGFeature(),
+				GradientFeatureType: NewGradientFeature(),
 			}
 		}
 	}
@@ -252,27 +259,35 @@ func (f *Features) Score(sample *samples.Sample) (Score, *Features) {
 func (f *Features) Extract(sample *samples.Sample, nSamples int) {
 	sample.Update()
 
-	for _, ftr := range f.basic {
-		ftr.Update(sample, nSamples)
+	for ftrType, ftr := range f.basic {
+		if FeatureFlags[ftrType] {
+			ftr.Update(sample, nSamples)
+		}
 	}
 
 	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
 	f.gridConfig = sampleGrid.Config()
 	for rc, ftrMap := range f.grid {
-		for _, ftr := range ftrMap {
-			ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
+			}
 		}
 	}
 
 	for r, ftrMap := range f.row {
-		for _, ftr := range ftrMap {
-			ftr.Update(sampleGrid.At(r, -1), nSamples)
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				ftr.Update(sampleGrid.At(r, -1), nSamples)
+			}
 		}
 	}
 
 	for c, ftrMap := range f.col {
-		for _, ftr := range ftrMap {
-			ftr.Update(sampleGrid.At(-1, c), nSamples)
+		for ftrType, ftr := range ftrMap {
+			if FeatureFlags[ftrType] {
+				ftr.Update(sampleGrid.At(-1, c), nSamples)
+			}
 		}
 	}
 }

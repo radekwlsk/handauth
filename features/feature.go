@@ -27,22 +27,6 @@ const (
 	GridAreaType
 )
 
-type FeatureType int
-
-func (t FeatureType) String() string {
-	return []string{
-		"LengthFeature",
-		"GradientFeature",
-		"AspectFeature",
-	}[t]
-}
-
-const (
-	LengthFeatureType FeatureType = iota
-	GradientFeatureType
-	AspectFeatureType
-)
-
 type FeatureMap map[FeatureType]*Feature
 type GridFeatureMap map[[2]int]FeatureMap
 type RowFeatureMap map[int]FeatureMap
@@ -80,6 +64,34 @@ func (m ColFeatureMap) GoString() string {
 	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
 }
 
+type FeatureType int
+
+func (t FeatureType) String() string {
+	return []string{
+		"LengthFeature",
+		"GradientFeature",
+		"AspectFeature",
+		"HOGFeature",
+	}[t]
+}
+
+const (
+	LengthFeatureType FeatureType = iota
+	GradientFeatureType
+	AspectFeatureType
+	HOGFeatureType
+)
+
+type Feature struct {
+	fType    FeatureType
+	std      float64
+	mean     float64
+	variance float64
+	max      float64
+	min      float64
+	function func(sample *samples.Sample) float64
+}
+
 func NewLengthFeature() *Feature {
 	return &Feature{fType: LengthFeatureType, function: length}
 }
@@ -92,14 +104,8 @@ func NewAspectFeature() *Feature {
 	return &Feature{fType: AspectFeatureType, function: aspect}
 }
 
-type Feature struct {
-	fType    FeatureType
-	std      float64
-	mean     float64
-	variance float64
-	max      float64
-	min      float64
-	function func(sample *samples.Sample) float64
+func NewHOGFeature() *Feature {
+	return &Feature{fType: HOGFeatureType, function: histogramOfGradients}
 }
 
 func (f *Feature) String() string {
@@ -183,28 +189,43 @@ func gradient(sample *samples.Sample) float64 {
 	}
 }
 
-//
-//func histogramOfGradients(sample *samples.Sample) float64 {
-//	if sample.Empty() {
-//		panic(fmt.Sprintf("empty mat in %#v", sample))
-//	}
-//	sobelX := gocv.NewMat()
-//	sobelY := gocv.NewMat()
-//	defer sobelX.Close()
-//	defer sobelY.Close()
-//	gocv.SpatialGradient(sample.Mat(), &sobelX, &sobelY, 3, gocv.BorderReplicate)
-//	magnitude := gocv.NewMat()
-//	angle := gocv.NewMat()
-//	defer magnitude.Close()
-//	defer angle.Close()
-//	gocv.CartToPolar(sobelX, sobelY, &magnitude, &angle, true)
-//	bins := map[int]float64{0: .0, 20: .0, 40: .0, 60: .0, 80: .0, 100: .0, 120: .0, 140: .0, 160: .0}
-//	for r := 0; r < angle.Rows(); r++ {
-//		for c := 0; c < angle.Cols(); c++ {
-//
-//		}
-//	}
-//
-//
-//	return float64(gocv.CountNonZero(sample.Mat()))
-//}
+func histogramOfGradients(sample *samples.Sample) float64 {
+	if sample.Empty() {
+		panic(fmt.Sprintf("empty mat in %#v", sample))
+	}
+	sobelX := gocv.NewMat()
+	sobelY := gocv.NewMat()
+	defer sobelX.Close()
+	defer sobelY.Close()
+	gocv.Sobel(sample.Mat(), &sobelX, gocv.MatTypeCV32F, 1, 0, 3, 1.0, 0.0, gocv.BorderReplicate)
+	gocv.Sobel(sample.Mat(), &sobelY, gocv.MatTypeCV32F, 0, 1, 3, 1.0, 0.0, gocv.BorderReplicate)
+	magnitude := gocv.NewMat()
+	angle := gocv.NewMat()
+	defer magnitude.Close()
+	defer angle.Close()
+	gocv.CartToPolar(sobelX, sobelY, &magnitude, &angle, true)
+	bins := make(map[int]float64)
+	for r := 0; r < angle.Rows(); r++ {
+		for c := 0; c < angle.Cols(); c++ {
+			a := math.Mod(float64(angle.GetFloatAt(r, c)), 180.0)
+			if a < 0 {
+				a = a + 180.0
+			}
+			b := int(math.RoundToEven(a))
+			bins[b] = bins[b] + float64(magnitude.GetFloatAt(r, c))
+		}
+	}
+	var total float64
+	for _, m := range bins {
+		total += m
+	}
+	weights := make([]float64, 90)
+	values := make([]float64, 90)
+	for i := 0; i < 90; i++ {
+		if m, ok := bins[i*2]; ok {
+			weights[i] = m / total
+		}
+		values[i] = float64(i)
+	}
+	return stat.Mean(values, weights)
+}
