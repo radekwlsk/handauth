@@ -19,7 +19,7 @@ const (
 	ColThresholdScaleDefault         = 1.0
 	AreaFilterFieldThresholdDefault  = 0.05
 	AreaFilterRowColThresholdDefault = 0.02
-	StdMeanFilterThresholdDefault    = 0.5
+	StdMeanFilterThresholdDefault    = 1.0
 )
 
 var (
@@ -38,11 +38,13 @@ var (
 		"test threshold scale for row score")
 	colThresholdScale = flag.Float64("col-scale", ColThresholdScaleDefault,
 		"test threshold scale for col score")
-	AreaFilterFieldThreshold = flag.Float64("filter-area-field", AreaFilterFieldThresholdDefault,
+	AreaFilterOff            = flag.Bool("no-area-filter", false, "turn area filter off")
+	AreaFilterFieldThreshold = flag.Float64("area-filter-field", AreaFilterFieldThresholdDefault,
 		"area filter field min threshold")
-	AreaFilterRowColThreshold = flag.Float64("filter-area-rowcol", AreaFilterRowColThresholdDefault,
+	AreaFilterRowColThreshold = flag.Float64("area-filter-rowcol", AreaFilterRowColThresholdDefault,
 		"area filter row/col min threshold")
-	StdMeanFilterThreshold = flag.Float64("filter-std", StdMeanFilterThresholdDefault,
+	StdMeanFilterOff       = flag.Bool("no-std-filter", false, "turn std-mean filter off")
+	StdMeanFilterThreshold = flag.Float64("std-filter", StdMeanFilterThresholdDefault,
 		"std-mean filter max threshold")
 )
 

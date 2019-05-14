@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/radekwlsk/handauth/cmd"
 	"github.com/radekwlsk/handauth/cmd/flags"
+	"github.com/radekwlsk/handauth/features"
 	"io/ioutil"
 	"log"
 	"math"
@@ -18,16 +19,47 @@ import (
 )
 
 const SplitDefault = 0.5
+const TestStartTimeFormat = "20060201-150405"
 
 var (
-	split         float64
-	fullResources bool
-	start         time.Time
-	outFileName   string
-	outWriter     *csv.Writer
-	workingDir    string
-	testMessage   string
+	split            float64
+	thresholds       []float64
+	thresholdWeights map[features.AreaType]float64
+	fullResources    bool
+	start            time.Time
+	startString      string
+	outFileName      string
+	outWriter        *csv.Writer
+	configWriter     *csv.Writer
+	workingDir       string
+	testMessage      string
 )
+
+func configRecords() [][]string {
+	config := [][]string{
+		{"message", testMessage},
+		{"date", start.String()},
+		{"full data", fmt.Sprintf("%v", fullResources)},
+		{"cols", fmt.Sprintf("%d", *flags.Cols)},
+		{"rows", fmt.Sprintf("%d", *flags.Rows)},
+		{"split", fmt.Sprintf("%.2f", split)},
+		{"using area filter", fmt.Sprintf("%v", !*flags.AreaFilterOff)},
+		{"field area min threshold", fmt.Sprintf("%.3f", *flags.AreaFilterFieldThreshold)},
+		{"row/col area min threshold", fmt.Sprintf("%.3f", *flags.AreaFilterRowColThreshold)},
+		{"using std-mean filter", fmt.Sprintf("%v", !*flags.StdMeanFilterOff)},
+		{"std-mean max mean ratio threshold", fmt.Sprintf("%.3f", *flags.StdMeanFilterThreshold)},
+	}
+	for a, w := range thresholdWeights {
+		config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
+	}
+	for t, f := range features.AreaFlags {
+		config = append(config, []string{fmt.Sprintf("using %s", t), fmt.Sprintf("%v", f)})
+	}
+	for t, f := range features.FeatureFlags {
+		config = append(config, []string{fmt.Sprintf("using %s", t), fmt.Sprintf("%v", f)})
+	}
+	return config
+}
 
 func main() {
 	flag.Float64Var(&split, "split", SplitDefault, "enroll/test data split ratio")
@@ -37,13 +69,16 @@ func main() {
 	flag.Parse()
 	cmd.UseFullResources = fullResources
 
+	start = time.Now()
+	startString = start.Format(TestStartTimeFormat)
+
 	if flags.Verbose() {
 		log.Println("Starting")
 	}
 
 	{
 		workingDir, _ = os.Getwd()
-		file, err := os.Create(path.Join(workingDir, "res", outFileName))
+		file, err := os.Create(path.Join(workingDir, "res", startString+"_"+outFileName))
 		if err != nil {
 			panic(err)
 		}
@@ -53,34 +88,22 @@ func main() {
 		defer outWriter.Flush()
 	}
 
-	thresholdWeights := flags.ThresholdWeights()
-	thresholds := flags.Thresholds()
+	thresholdWeights = flags.ThresholdWeights()
+	thresholds = flags.Thresholds()
 
 	{
 		ext := filepath.Ext(outFileName)
-		configFileName := strings.TrimSuffix(outFileName, ext) + "_config" + ext
+		configFileName := startString + "_" + strings.TrimSuffix(outFileName, ext) + "_config" + ext
 		file, err := os.Create(path.Join(workingDir, "res", configFileName))
 		if err != nil {
 			panic(err)
 		}
+		defer file.Close()
 
-		configWriter := csv.NewWriter(file)
-		config := [][]string{
-			{"full data", fmt.Sprintf("%v", fullResources)},
-			{"cols", fmt.Sprintf("%d", *flags.Cols)},
-			{"rows", fmt.Sprintf("%d", *flags.Rows)},
-			{"split", fmt.Sprintf("%.2f", split)},
-			{"field area filter", fmt.Sprintf("%.3f", *flags.AreaFilterFieldThreshold)},
-			{"row/col area filter", fmt.Sprintf("%.3f", *flags.AreaFilterRowColThreshold)},
-			{"std-mean filter", fmt.Sprintf("%.3f", *flags.StdMeanFilterThreshold)},
-			{"message", testMessage},
-		}
-		for a, w := range thresholdWeights {
-			config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
-		}
-		_ = configWriter.WriteAll(config)
+		configWriter = csv.NewWriter(file)
+		defer configWriter.Flush()
+		_ = configWriter.WriteAll(configRecords())
 		configWriter.Flush()
-		_ = file.Close()
 	}
 
 	genuineSamplesUsers := make(map[int][]int)
@@ -149,9 +172,7 @@ func main() {
 
 	users := map[uint8]*cmd.UserFeatures{}
 	{
-		if flags.Verbose() {
-			start = time.Now()
-		}
+		start := time.Now()
 		featuresChan := make(chan *cmd.UserFeatures)
 
 		for user, samples := range genuineSamplesUsers {
@@ -169,10 +190,12 @@ func main() {
 				}
 			}
 		}
-
 		close(featuresChan)
+
+		elapsed := time.Since(start)
+		_ = configWriter.Write([]string{"enroll duration", elapsed.String()})
 		if flags.Verbose() {
-			log.Printf("Enrolled %d users in %s\n", len(users), time.Since(start))
+			log.Printf("Enrolled %d users in %s\n", len(users), elapsed)
 		}
 	}
 
@@ -183,9 +206,7 @@ func main() {
 	}
 
 	{
-		if flags.Verbose() {
-			start = time.Now()
-		}
+		start := time.Now()
 
 		for id, user := range users {
 			samples := genuineSamplesUsers[int(id)]
@@ -223,8 +244,11 @@ func main() {
 			}
 		}
 		close(genuineResultsChan)
+
+		elapsed := time.Since(start)
+		_ = configWriter.Write([]string{"genuine verification duration", elapsed.String()})
 		if flags.Verbose() {
-			log.Printf("Verified all genuine users in %s\n", time.Since(start))
+			log.Printf("Verified all genuine users in %s\n", elapsed)
 		}
 	}
 
@@ -235,9 +259,7 @@ func main() {
 	}
 
 	{
-		if flags.Verbose() {
-			start = time.Now()
-		}
+		start := time.Now()
 
 		for forgerUser, samples := range forgerySamplesUsers {
 			go cmd.VerifyUserSync(
@@ -283,8 +305,11 @@ func main() {
 			}
 		}
 		close(forgeriesResultsChan)
+
+		elapsed := time.Since(start)
+		_ = configWriter.Write([]string{"forgeries verification duration", elapsed.String()})
 		if flags.Verbose() {
-			log.Printf("Verified all forgeries in %s\n", time.Since(start))
+			log.Printf("Verified all forgeries in %s\n", elapsed)
 		}
 	}
 	_ = outWriter.Write([]string{"threshold", "frr", "far"})
@@ -295,4 +320,5 @@ func main() {
 			fmt.Sprintf("%.4f", forgeriesStats.AcceptanceRate(t)),
 		})
 	}
+	_ = configWriter.Write([]string{"total test duration", time.Since(start).String()})
 }
