@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"github.com/radekwlsk/handauth/cmd"
 	"github.com/radekwlsk/handauth/cmd/flags"
-	"github.com/radekwlsk/handauth/features"
+	"github.com/radekwlsk/handauth/signature"
+	"github.com/radekwlsk/handauth/signature/features"
 	"io/ioutil"
 	"log"
 	"math"
@@ -24,7 +25,7 @@ const TestStartTimeFormat = "20060201-150405"
 var (
 	split            float64
 	thresholds       []float64
-	thresholdWeights map[features.AreaType]float64
+	thresholdWeights map[signature.AreaType]float64
 	fullResources    bool
 	start            time.Time
 	startString      string
@@ -52,7 +53,7 @@ func configRecords() [][]string {
 	for a, w := range thresholdWeights {
 		config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})
 	}
-	for t, f := range features.AreaFlags {
+	for t, f := range signature.AreaFlags {
 		config = append(config, []string{fmt.Sprintf("using %s", t), fmt.Sprintf("%v", f)})
 	}
 	for t, f := range features.FeatureFlags {
@@ -170,10 +171,10 @@ func main() {
 		}
 	}
 
-	users := map[uint8]*cmd.UserFeatures{}
+	users := map[uint8]*signature.UserModel{}
 	{
 		start := time.Now()
-		featuresChan := make(chan *cmd.UserFeatures)
+		featuresChan := make(chan *signature.UserModel)
 
 		for user, samples := range genuineSamplesUsers {
 			enrollSplit := math.Ceil(float64(len(samples)) * split)
@@ -183,7 +184,7 @@ func main() {
 
 		for range genuineSamplesUsers {
 			f := <-featuresChan
-			if f.Features != nil {
+			if f.Model != nil {
 				users[f.Id] = f
 				if *flags.VVerbose {
 					log.Printf("\tEnrolled user %03d\n", f.Id)

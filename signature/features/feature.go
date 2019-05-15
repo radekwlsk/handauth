@@ -26,13 +26,6 @@ const (
 	HOGFeatureType
 )
 
-var FeatureFlags = map[FeatureType]bool{
-	LengthFeatureType:   true,
-	GradientFeatureType: true,
-	AspectFeatureType:   true,
-	HOGFeatureType:      true,
-}
-
 type Feature struct {
 	fType    FeatureType
 	std      float64
@@ -96,4 +89,21 @@ func (f *Feature) Std() float64 {
 
 func (f *Feature) Score(other *Feature) float64 {
 	return stat.StdScore(other.Value(), f.mean, f.std)
+}
+
+type FeatureMap map[FeatureType]*Feature
+
+func (m FeatureMap) GoString() string {
+	var ftrStrings []string
+	for _, ftr := range m {
+		ftrStrings = append(ftrStrings, ftr.String())
+	}
+	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
+}
+
+var FeatureFlags = map[FeatureType]bool{
+	LengthFeatureType:   true,
+	GradientFeatureType: true,
+	AspectFeatureType:   true,
+	HOGFeatureType:      true,
 }

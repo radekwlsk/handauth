@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"github.com/radekwlsk/handauth/cmd/flags"
-	"github.com/radekwlsk/handauth/features"
 	"github.com/radekwlsk/handauth/samples"
+	"github.com/radekwlsk/handauth/signature"
 	"path"
 )
 
@@ -15,11 +15,6 @@ const ResourcesTestForgeryPath = "/home/radoslaw/go/src/github.com/radekwlsk/han
 const FileNameFormat = "NFI-%03d%02d%03d.png"
 
 var UseFullResources = true
-
-type UserFeatures struct {
-	Id       uint8
-	Features *features.Model
-}
 
 func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 	var resPath string
@@ -38,34 +33,33 @@ func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 	}
 	filePath := path.Join(resPath, fmt.Sprintf(FileNameFormat, creator, index, user))
 	userName := fmt.Sprintf("%02d", user)
-	signature, err := samples.NewUserSample(userName, filePath)
+	sample, err := samples.NewUserSample(userName, filePath)
 	if err != nil {
 		return nil, err
 	} else {
-		return signature, nil
+		return sample, nil
 	}
 }
 
-func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) UserFeatures {
-	template := features.NewModel(rows, cols, nil)
+func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) signature.UserModel {
+	template := signature.NewModel(rows, cols, nil)
 	ok := false
-	var signature *samples.UserSample
+	var sample *samples.UserSample
 	var err error
 	for i, s := range samplesIds {
-		signature, err = ReadUserSample(id, id, uint8(s))
+		sample, err = ReadUserSample(id, id, uint8(s))
 		if err != nil {
 			continue
 		} else {
 			ok = true
 		}
-		signature.Preprocess()
-		template.Extract(signature.Sample(), i+1)
-		signature.Close()
+		sample.Preprocess()
+		template.Extract(sample.Sample(), i+1)
+		sample.Close()
 	}
 	if !ok {
-		return UserFeatures{
-			id,
-			nil,
+		return signature.UserModel{
+			Id: id,
 		}
 	}
 	if !*flags.AreaFilterOff {
@@ -74,13 +68,13 @@ func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) UserFeatures {
 	if !*flags.StdMeanFilterOff {
 		_ = template.StdMeanFilter(*flags.StdMeanFilterThreshold)
 	}
-	return UserFeatures{
-		id,
-		template,
+	return signature.UserModel{
+		Id:    id,
+		Model: template,
 	}
 }
 
-func EnrollUserSync(id uint8, samplesIds []int, rows, cols uint16, users chan *UserFeatures) {
+func EnrollUserSync(id uint8, samplesIds []int, rows, cols uint16, users chan *signature.UserModel) {
 	uf := EnrollUser(id, samplesIds, rows, cols)
 	users <- &uf
 	return
@@ -93,23 +87,23 @@ type VerificationResult struct {
 	RejectedCounts []uint8
 }
 
-func scoreSample(id, i uint8, template *UserFeatures) (features.Score, error) {
-	signature, err := ReadUserSample(id, template.Id, i)
+func scoreSample(id, i uint8, template *signature.UserModel) (signature.Score, error) {
+	sample, err := ReadUserSample(id, template.Id, i)
 	if err != nil {
 		return nil, err
 	}
-	signature.Preprocess()
-	score, _ := template.Features.Score(signature.Sample())
-	signature.Close()
+	sample.Preprocess()
+	score, _ := template.Model.Score(sample.Sample())
+	sample.Close()
 	return score, nil
 }
 
 func VerifyUser(
 	id uint8,
 	samplesIds []int,
-	template *UserFeatures,
+	template *signature.UserModel,
 	thresholds []float64,
-	thresholdWeights map[features.AreaType]float64,
+	thresholdWeights map[signature.AreaType]float64,
 ) VerificationResult {
 	successes := make([]uint8, len(thresholds))
 	rejections := make([]uint8, len(thresholds))
@@ -140,9 +134,9 @@ func VerifyUser(
 func VerifyUserSync(
 	id uint8,
 	samplesIds []int,
-	template *UserFeatures,
+	template *signature.UserModel,
 	thresholds []float64,
-	thresholdWeights map[features.AreaType]float64,
+	thresholdWeights map[signature.AreaType]float64,
 	results chan *VerificationResult,
 ) {
 	r := VerifyUser(id, samplesIds, template, thresholds, thresholdWeights)

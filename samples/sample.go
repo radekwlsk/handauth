@@ -18,7 +18,6 @@ import (
 
 const (
 	TargetWidth = 500.0
-	Stride      = 7.0
 )
 
 var Debug = false
@@ -43,7 +42,7 @@ func NewSample(filename string) (*Sample, error) {
 		return nil, fmt.Errorf("could not read file %s", filename)
 	}
 	if Debug {
-		logger.Printf("read sample from %s: %s\n", filename, s)
+		logger.Printf("read sample from %s: %#v\n", filename, s)
 	}
 	return s, err
 }
@@ -171,7 +170,7 @@ func (sample *Sample) toLines() {
 	for i := 0; i < matLines.Rows(); i++ {
 		pt1 := image.Pt(int(matLines.GetVeciAt(i, 0)[0]), int(matLines.GetVeciAt(i, 0)[1]))
 		pt2 := image.Pt(int(matLines.GetVeciAt(i, 0)[2]), int(matLines.GetVeciAt(i, 0)[3]))
-		gocv.Line(&dst, pt1, pt2, color.RGBA{255, 255, 255, 0}, 1)
+		gocv.Line(&dst, pt1, pt2, color.RGBA{R: 255, G: 255, B: 255}, 1)
 	}
 
 	_ = sample.mat.Close()
@@ -240,7 +239,7 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 		log.Println(err)
 	}
 	if Debug {
-		log.Printf("saved sample %s as %s", sample, f.Name())
+		log.Printf("saved sample %#v as %s", sample, f.Name())
 	}
 	if show {
 		command := "display"
@@ -257,7 +256,8 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 
 func (sample *Sample) GoString() string {
 	return fmt.Sprintf(
-		"<Sample %dx%d area %d>",
+		"<%T %dx%d area %d>",
+		sample,
 		int(sample.width),
 		int(sample.height),
 		sample.Area(),

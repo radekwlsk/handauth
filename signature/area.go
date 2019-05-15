@@ -1,16 +1,10 @@
-package features
+package signature
 
 import (
 	"fmt"
+	"github.com/radekwlsk/handauth/signature/features"
 	"strings"
 )
-
-var AreaFlags = map[AreaType]bool{
-	BasicAreaType: true,
-	RowAreaType:   true,
-	ColAreaType:   true,
-	GridAreaType:  true,
-}
 
 type AreaType int
 
@@ -30,18 +24,9 @@ const (
 	GridAreaType
 )
 
-type FeatureMap map[FeatureType]*Feature
-type GridFeatureMap map[[2]int]FeatureMap
-type RowFeatureMap map[int]FeatureMap
-type ColFeatureMap map[int]FeatureMap
-
-func (m FeatureMap) GoString() string {
-	var ftrStrings []string
-	for _, ftr := range m {
-		ftrStrings = append(ftrStrings, ftr.String())
-	}
-	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
-}
+type GridFeatureMap map[[2]int]features.FeatureMap
+type RowFeatureMap map[int]features.FeatureMap
+type ColFeatureMap map[int]features.FeatureMap
 
 func (m GridFeatureMap) GoString() string {
 	var ftrStrings []string

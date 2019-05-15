@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"github.com/radekwlsk/handauth/cmd"
-	"github.com/radekwlsk/handauth/features"
 	"github.com/radekwlsk/handauth/samples"
+	"github.com/radekwlsk/handauth/signature"
 )
 
 var debug bool
@@ -16,7 +16,7 @@ func main() {
 	flag.Parse()
 
 	samples.Debug = debug
-	features.Debug = debug
+	signature.Debug = debug
 
 	//uf := cmd.EnrollUser(uint8(userId), []int{1, 2, 3, 4}, uint16(*flags.Rows), uint16(*flags.Cols))
 	//template := uf.Model
