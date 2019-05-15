@@ -19,7 +19,7 @@ func main() {
 	features.Debug = debug
 
 	//uf := cmd.EnrollUser(uint8(userId), []int{1, 2, 3, 4}, uint16(*flags.Rows), uint16(*flags.Cols))
-	//template := uf.Features
+	//template := uf.Model
 	//fmt.Println(template.FieldsCount())
 	//fmt.Println(template.RowsCount())
 	//fmt.Println(template.ColsCount())
@@ -33,7 +33,7 @@ func main() {
 	//sg := samples.NewSampleGrid(us.Sample(), uint16(*flags.Rows), uint16(*flags.Cols))
 	//sg.Save("res", "grid", false)
 	//fmt.Printf("%#v\n", sg)
-	//template := features.NewFeatures(uint16(*flags.Rows), uint16(*flags.Cols), nil)
+	//template := features.NewModel(uint16(*flags.Rows), uint16(*flags.Cols), nil)
 	//template.Extract(us.Sample(), 1)
 
 	//fmt.Println("BEFORE")

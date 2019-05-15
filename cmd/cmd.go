@@ -18,7 +18,7 @@ var UseFullResources = true
 
 type UserFeatures struct {
 	Id       uint8
-	Features *features.Features
+	Features *features.Model
 }
 
 func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
@@ -47,7 +47,7 @@ func ReadUserSample(creator, user, index uint8) (*samples.UserSample, error) {
 }
 
 func EnrollUser(id uint8, samplesIds []int, rows, cols uint16) UserFeatures {
-	template := features.NewFeatures(rows, cols, nil)
+	template := features.NewModel(rows, cols, nil)
 	ok := false
 	var signature *samples.UserSample
 	var err error

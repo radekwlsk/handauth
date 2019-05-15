@@ -12,7 +12,7 @@ type Template struct {
 	width             int
 	gridStride        float64
 	gridSize          [2]float64
-	features          *features.Features
+	features          *features.Model
 	featuresEnabled   map[features.AreaType]bool
 	featuresAvailable map[features.AreaType]bool
 }
