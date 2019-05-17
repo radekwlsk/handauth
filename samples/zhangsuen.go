@@ -18,7 +18,7 @@ func ZhangSuen(src gocv.Mat, dst *gocv.Mat) {
 		panic(err)
 	}
 	grayImg := image.NewGray(img.Bounds())
-	draw.Draw(grayImg, grayImg.Bounds(), img, image.Point{}, draw.Over)
+	draw.Draw(grayImg, grayImg.Bounds(), img, image.ZP, draw.Over)
 	rows := src.Rows()
 	cols := src.Cols()
 	for s1Flag || s2Flag {
