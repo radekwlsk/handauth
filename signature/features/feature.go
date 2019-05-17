@@ -93,6 +93,10 @@ func (f *Feature) Value() float64 {
 	return f.mean
 }
 
+func (f *Feature) Var() float64 {
+	return f.variance
+}
+
 func (f *Feature) Std() float64 {
 	return f.std
 }
