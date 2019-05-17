@@ -112,7 +112,7 @@ func plotHeatmap(data *mat.Dense, title string, filename string) {
 	l.Draw(dc)
 	dc = draw.Crop(dc, 0, -legendWidth-vg.Millimeter, 0, 0) // Make space for the legend.
 	p.Draw(dc)
-	w, err := os.Create(path.Join("plots", filename))
+	w, err := os.Create(path.Join("res", filename))
 	if err != nil {
 		log.Panic(err)
 	}
