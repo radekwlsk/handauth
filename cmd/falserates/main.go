@@ -8,13 +8,11 @@ import (
 	"github.com/radekwlsk/handauth/cmd/flags"
 	"github.com/radekwlsk/handauth/signature"
 	"github.com/radekwlsk/handauth/signature/features"
-	"io/ioutil"
 	"log"
 	"math"
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -107,69 +105,8 @@ func main() {
 		configWriter.Flush()
 	}
 
-	genuineSamplesUsers := make(map[int][]int)
-	forgerySamplesUsers := make(map[[2]int][]int)
-	{
-		var genuinePath string
-		if fullResources {
-			genuinePath = cmd.ResourcesFullGenuinePath
-		} else {
-			genuinePath = cmd.ResourcesTestGenuinePath
-		}
-		files, err := ioutil.ReadDir(genuinePath)
-		if err != nil {
-			panic("couldn't read files")
-		}
-		for _, f := range files {
-			if !f.IsDir() {
-				user, err := strconv.Atoi(f.Name()[4:7])
-				if err != nil {
-					panic("wrong user id position")
-				}
-				sample, err := strconv.Atoi(f.Name()[7:9])
-				if err != nil {
-					panic("wrong sample id position")
-				}
-				if _, ok := genuineSamplesUsers[user]; ok {
-					genuineSamplesUsers[user] = append(genuineSamplesUsers[user], sample)
-				} else {
-					genuineSamplesUsers[user] = []int{sample}
-				}
-			}
-		}
-		var forgeryPath string
-		if fullResources {
-			forgeryPath = cmd.ResourcesFullForgeryPath
-		} else {
-			forgeryPath = cmd.ResourcesTestForgeryPath
-		}
-		files, err = ioutil.ReadDir(forgeryPath)
-		if err != nil {
-			panic("couldn't read files")
-		}
-		for _, f := range files {
-			if !f.IsDir() {
-				sample, err := strconv.Atoi(f.Name()[7:9])
-				if err != nil {
-					panic("wrong sample id position")
-				}
-				forger, err := strconv.Atoi(f.Name()[4:7])
-				if err != nil {
-					panic("wrong forger id position")
-				}
-				user, err := strconv.Atoi(f.Name()[9:12])
-				if err != nil {
-					panic("wrong user id position")
-				}
-				key := [2]int{forger, user}
-				if _, ok := forgerySamplesUsers[key]; ok {
-					forgerySamplesUsers[key] = append(forgerySamplesUsers[key], sample)
-				} else {
-					forgerySamplesUsers[key] = []int{sample}
-				}
-			}
-		}
-	}
+	genuineSamplesUsers := cmd.GenuineUsers(fullResources)
+	forgerySamplesUsers := cmd.ForgeryUsers(fullResources)
 
 	users := map[uint8]*signature.UserModel{}
 	{

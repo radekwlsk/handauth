@@ -5,7 +5,9 @@ import (
 	"github.com/radekwlsk/handauth/cmd/flags"
 	"github.com/radekwlsk/handauth/samples"
 	"github.com/radekwlsk/handauth/signature"
+	"io/ioutil"
 	"path"
+	"strconv"
 )
 
 const ResourcesFullGenuinePath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/genuines/full/"
@@ -159,4 +161,73 @@ func (s *VerificationStat) RejectionRate(t float64) float64 {
 
 func (s *VerificationStat) Count(t float64) int {
 	return int(s.PositiveCounts[t] + s.NegativeCounts[t])
+}
+
+func GenuineUsers(full bool) map[int][]int {
+	genuineSamplesUsers := make(map[int][]int)
+	var genuinePath string
+	if full {
+		genuinePath = ResourcesFullGenuinePath
+	} else {
+		genuinePath = ResourcesTestGenuinePath
+	}
+	files, err := ioutil.ReadDir(genuinePath)
+	if err != nil {
+		panic("couldn't read files")
+	}
+	for _, f := range files {
+		if !f.IsDir() {
+			user, err := strconv.Atoi(f.Name()[4:7])
+			if err != nil {
+				panic("wrong user id position")
+			}
+			sample, err := strconv.Atoi(f.Name()[7:9])
+			if err != nil {
+				panic("wrong sample id position")
+			}
+			if _, ok := genuineSamplesUsers[user]; ok {
+				genuineSamplesUsers[user] = append(genuineSamplesUsers[user], sample)
+			} else {
+				genuineSamplesUsers[user] = []int{sample}
+			}
+		}
+	}
+	return genuineSamplesUsers
+}
+
+func ForgeryUsers(full bool) map[[2]int][]int {
+	forgerySamplesUsers := make(map[[2]int][]int)
+	var forgeryPath string
+	if full {
+		forgeryPath = ResourcesFullForgeryPath
+	} else {
+		forgeryPath = ResourcesTestForgeryPath
+	}
+	files, err := ioutil.ReadDir(forgeryPath)
+	if err != nil {
+		panic("couldn't read files")
+	}
+	for _, f := range files {
+		if !f.IsDir() {
+			sample, err := strconv.Atoi(f.Name()[7:9])
+			if err != nil {
+				panic("wrong sample id position")
+			}
+			forger, err := strconv.Atoi(f.Name()[4:7])
+			if err != nil {
+				panic("wrong forger id position")
+			}
+			user, err := strconv.Atoi(f.Name()[9:12])
+			if err != nil {
+				panic("wrong user id position")
+			}
+			key := [2]int{forger, user}
+			if _, ok := forgerySamplesUsers[key]; ok {
+				forgerySamplesUsers[key] = append(forgerySamplesUsers[key], sample)
+			} else {
+				forgerySamplesUsers[key] = []int{sample}
+			}
+		}
+	}
+	return forgerySamplesUsers
 }
