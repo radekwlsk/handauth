@@ -15,6 +15,8 @@ func NewHOGFeature() *Feature {
 func histogramOfGradients(sample *samples.Sample) float64 {
 	if sample.Empty() {
 		panic(fmt.Sprintf("empty mat in %#v", sample))
+	} else if gocv.CountNonZero(sample.Mat()) == 0 {
+		return 0.0
 	}
 	sobelX := gocv.NewMat()
 	sobelY := gocv.NewMat()
@@ -35,7 +37,7 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 				a = a + 180.0
 			}
 			b := int(math.RoundToEven(a))
-			bins[b] = bins[b] + float64(magnitude.GetFloatAt(r, c))
+			bins[b/2] = bins[b/2] + float64(magnitude.GetFloatAt(r, c))
 		}
 	}
 	var total float64
@@ -45,10 +47,13 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 	weights := make([]float64, 90)
 	values := make([]float64, 90)
 	for i := 0; i < 90; i++ {
-		if m, ok := bins[i*2]; ok {
-			weights[i] = m / total
+		if total > 0 {
+			weights[i] = bins[i] / total
+		} else {
+			weights[i] = 0.0
 		}
 		values[i] = float64(i)
 	}
-	return stat.Mean(values, weights)
+	value := stat.Mean(values, weights)
+	return value
 }
