@@ -14,6 +14,13 @@ import (
 var Debug = false
 var logger = log.New(os.Stdout, "[features] ", log.Lshortfile+log.Ltime)
 
+var AreaFlags = map[AreaType]bool{
+	BasicAreaType: true,
+	RowAreaType:   true,
+	ColAreaType:   true,
+	GridAreaType:  true,
+}
+
 type UserModel struct {
 	Id    uint8
 	Model *Model
@@ -27,6 +34,22 @@ type Model struct {
 	rows       uint16
 	cols       uint16
 	gridConfig samples.GridConfig
+}
+
+func (model *Model) Basic() features.FeatureMap {
+	return model.basic
+}
+
+func (model *Model) Grid(r, c int) features.FeatureMap {
+	return model.grid[[2]int{r, c}]
+}
+
+func (model *Model) Row(r int) features.FeatureMap {
+	return model.row[r]
+}
+
+func (model *Model) Col(c int) features.FeatureMap {
+	return model.col[c]
 }
 
 func NewModel(rows, cols uint16, template *Model) *Model {
@@ -81,6 +104,7 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 				features.LengthFeatureType:   features.NewLengthFeature(),
 				features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
+				features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -91,6 +115,7 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 				features.LengthFeatureType:   features.NewLengthFeature(),
 				features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
+				features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -101,6 +126,7 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 				features.LengthFeatureType:   features.NewLengthFeature(),
 				features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
+				features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -114,25 +140,33 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 	}
 }
 
-func (f *Model) GoString() string {
+func (model *Model) GoString() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("\t%#v\n", f.basic))
-	sb.WriteString(fmt.Sprintf("\t%#v\n", f.grid))
-	sb.WriteString(fmt.Sprintf("\t%#v\n", f.row))
-	sb.WriteString(fmt.Sprintf("\t%#v\n", f.col))
-	return fmt.Sprintf("<%T \n%s>", f, sb.String())
+	if AreaFlags[BasicAreaType] {
+		sb.WriteString(fmt.Sprintf("\t%#v\n", model.basic))
+	}
+	if AreaFlags[GridAreaType] {
+		sb.WriteString(fmt.Sprintf("\t%#v\n", model.grid))
+	}
+	if AreaFlags[RowAreaType] {
+		sb.WriteString(fmt.Sprintf("\t%#v\n", model.row))
+	}
+	if AreaFlags[ColAreaType] {
+		sb.WriteString(fmt.Sprintf("\t%#v\n", model.col))
+	}
+	return fmt.Sprintf("<%T \n%s>", model, sb.String())
 }
 
-func (f *Model) FieldsCount() int {
-	return len(f.grid)
+func (model *Model) FieldsCount() int {
+	return len(model.grid)
 }
 
-func (f *Model) RowsCount() int {
-	return len(f.row)
+func (model *Model) RowsCount() int {
+	return len(model.row)
 }
 
-func (f *Model) ColsCount() int {
-	return len(f.col)
+func (model *Model) ColsCount() int {
+	return len(model.col)
 }
 
 type Score map[AreaType]float64
@@ -220,7 +254,7 @@ func scoreCol(t, s *Model) float64 {
 	return stat.Mean(css, nil)
 }
 
-func (f *Model) getScoreFunc(area AreaType) (func(ftr1, ftr2 *Model) float64, bool) {
+func (model *Model) getScoreFunc(area AreaType) (func(ftr1, ftr2 *Model) float64, bool) {
 	switch area {
 	case BasicAreaType:
 		return scoreBasic, true
@@ -235,33 +269,33 @@ func (f *Model) getScoreFunc(area AreaType) (func(ftr1, ftr2 *Model) float64, bo
 	}
 }
 
-func (f *Model) Score(sample *samples.Sample) (Score, *Model) {
-	pattern := NewModel(f.rows, f.cols, f)
+func (model *Model) Score(sample *samples.Sample) (Score, *Model) {
+	pattern := NewModel(model.rows, model.cols, model)
 	pattern.Extract(sample, 1)
 
 	score := make(Score)
 
 	for area, flag := range AreaFlags {
-		if scoreFunc, ok := f.getScoreFunc(area); flag && ok {
-			score[area] = scoreFunc(f, pattern)
+		if scoreFunc, ok := model.getScoreFunc(area); flag && ok {
+			score[area] = scoreFunc(model, pattern)
 		}
 	}
 
 	return score, pattern
 }
 
-func (f *Model) Extract(sample *samples.Sample, nSamples int) {
+func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	sample.Update()
 
-	for ftrType, ftr := range f.basic {
+	for ftrType, ftr := range model.basic {
 		if features.FeatureFlags[ftrType] {
 			ftr.Update(sample, nSamples)
 		}
 	}
 
-	sampleGrid := samples.NewSampleGrid(sample, f.rows, f.cols)
-	f.gridConfig = sampleGrid.Config()
-	for rc, ftrMap := range f.grid {
+	sampleGrid := samples.NewSampleGrid(sample, model.rows, model.cols)
+	model.gridConfig = sampleGrid.Config()
+	for rc, ftrMap := range model.grid {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
 				ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
@@ -269,7 +303,7 @@ func (f *Model) Extract(sample *samples.Sample, nSamples int) {
 		}
 	}
 
-	for r, ftrMap := range f.row {
+	for r, ftrMap := range model.row {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
 				ftr.Update(sampleGrid.At(r, -1), nSamples)
@@ -277,7 +311,7 @@ func (f *Model) Extract(sample *samples.Sample, nSamples int) {
 		}
 	}
 
-	for c, ftrMap := range f.col {
+	for c, ftrMap := range model.col {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
 				ftr.Update(sampleGrid.At(-1, c), nSamples)
@@ -286,75 +320,71 @@ func (f *Model) Extract(sample *samples.Sample, nSamples int) {
 	}
 }
 
-func (f *Model) AreaFilter(fieldThreshold float64, rowColThreshold float64) error {
-	if f.gridConfig == (samples.GridConfig{}) {
+func (model *Model) AreaFilter(fieldThreshold float64, rowColThreshold float64) error {
+	if model.gridConfig == (samples.GridConfig{}) {
 		return fmt.Errorf("at least one sample has to be extracted before filtering")
 	}
+	if !features.FeatureFlags[features.LengthFeatureType] {
+		return nil
+	}
 
-	fieldAreaLimit := f.gridConfig.FieldArea() * fieldThreshold
-	rowAreaLimit := f.gridConfig.RowArea() * rowColThreshold
-	colAreaLimit := f.gridConfig.ColArea() * rowColThreshold
+	fieldAreaLimit := model.gridConfig.FieldArea() * fieldThreshold
+	rowAreaLimit := model.gridConfig.RowArea() * rowColThreshold
+	colAreaLimit := model.gridConfig.ColArea() * rowColThreshold
 
-	for rc, ftrMap := range f.grid {
+	for rc, ftrMap := range model.grid {
 		lnFtr := ftrMap[features.LengthFeatureType]
 		if lnFtr.Value() < fieldAreaLimit {
-			delete(f.grid, rc)
+			delete(model.grid, rc)
 		}
 	}
 
-	for r, ftrMap := range f.row {
+	for r, ftrMap := range model.row {
 		lnFtr := ftrMap[features.LengthFeatureType]
 		if lnFtr.Value() < rowAreaLimit {
-			delete(f.row, r)
+			delete(model.row, r)
 		}
 	}
 
-	for c, ftrMap := range f.col {
+	for c, ftrMap := range model.col {
 		lnFtr := ftrMap[features.LengthFeatureType]
 		if lnFtr.Value() < colAreaLimit {
-			delete(f.col, c)
+			delete(model.col, c)
 		}
 	}
 	return nil
 }
 
-func (f *Model) StdMeanFilter(threshold float64) error {
-	if f.gridConfig == (samples.GridConfig{}) {
+func (model *Model) StdMeanFilter(threshold float64) error {
+	if model.gridConfig == (samples.GridConfig{}) {
 		return fmt.Errorf("at least one sample has to be extracted before filtering")
 	}
 
-	for rc, ftrMap := range f.grid {
+	for rc, ftrMap := range model.grid {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(f.grid, rc)
+				delete(model.grid, rc)
 				break
 			}
 		}
 	}
 
-	for r, ftrMap := range f.row {
+	for r, ftrMap := range model.row {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(f.row, r)
+				delete(model.row, r)
 				break
 			}
 		}
 	}
 
-	for c, ftrMap := range f.col {
+	for c, ftrMap := range model.col {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(f.col, c)
+				delete(model.col, c)
 				break
 			}
 		}
 	}
 	return nil
-}
-
-var AreaFlags = map[AreaType]bool{
-	BasicAreaType: true,
-	RowAreaType:   true,
-	ColAreaType:   true,
-	GridAreaType:  true,
 }

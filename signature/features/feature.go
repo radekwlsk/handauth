@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+var FeatureFlags = map[FeatureType]bool{
+	LengthFeatureType:   true,
+	GradientFeatureType: true,
+	AspectFeatureType:   true,
+	HOGFeatureType:      true,
+	CornersFeatureType:  true,
+}
+
 type FeatureType int
 
 func (t FeatureType) String() string {
@@ -16,6 +24,7 @@ func (t FeatureType) String() string {
 		"GradientFeature",
 		"AspectFeature",
 		"HOGFeature",
+		"CornersFeature",
 	}[t]
 }
 
@@ -24,6 +33,7 @@ const (
 	GradientFeatureType
 	AspectFeatureType
 	HOGFeatureType
+	CornersFeatureType
 )
 
 type Feature struct {
@@ -95,15 +105,10 @@ type FeatureMap map[FeatureType]*Feature
 
 func (m FeatureMap) GoString() string {
 	var ftrStrings []string
-	for _, ftr := range m {
-		ftrStrings = append(ftrStrings, ftr.String())
+	for ftrType, ftr := range m {
+		if FeatureFlags[ftrType] {
+			ftrStrings = append(ftrStrings, ftr.String())
+		}
 	}
 	return fmt.Sprintf("<%T %s>", m, strings.Join(ftrStrings, ", "))
-}
-
-var FeatureFlags = map[FeatureType]bool{
-	LengthFeatureType:   true,
-	GradientFeatureType: true,
-	AspectFeatureType:   true,
-	HOGFeatureType:      true,
 }
