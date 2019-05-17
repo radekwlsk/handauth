@@ -22,8 +22,10 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 	sobelY := gocv.NewMat()
 	defer sobelX.Close()
 	defer sobelY.Close()
-	gocv.Sobel(sample.Mat(), &sobelX, gocv.MatTypeCV32F, 1, 0, 3, 1.0, 0.0, gocv.BorderReplicate)
-	gocv.Sobel(sample.Mat(), &sobelY, gocv.MatTypeCV32F, 0, 1, 3, 1.0, 0.0, gocv.BorderReplicate)
+	gocv.Sobel(sample.Mat(), &sobelX, gocv.MatTypeCV32F,
+		1, 0, 3, 1.0, 0.0, gocv.BorderReplicate)
+	gocv.Sobel(sample.Mat(), &sobelY, gocv.MatTypeCV32F,
+		0, 1, 3, 1.0, 0.0, gocv.BorderReplicate)
 	magnitude := gocv.NewMat()
 	angle := gocv.NewMat()
 	defer magnitude.Close()
