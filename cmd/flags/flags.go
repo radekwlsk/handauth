@@ -17,7 +17,7 @@ const (
 	GridThresholdScaleDefault        = 1.0
 	RowThresholdScaleDefault         = 1.0
 	ColThresholdScaleDefault         = 1.0
-	AreaFilterFieldThresholdDefault  = 0.05
+	AreaFilterFieldThresholdDefault  = 0.03
 	AreaFilterRowColThresholdDefault = 0.02
 	StdMeanFilterThresholdDefault    = 1.0
 )
