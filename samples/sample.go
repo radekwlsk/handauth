@@ -219,6 +219,13 @@ func (sample *Sample) Resize(width int, ratio float64) {
 	sample.mat = dst
 }
 
+func (sample *Sample) CenterOfMass() image.Point {
+	m := gocv.Moments(sample.mat, true)
+	x := int(math.Round(m["m10"] / m["m00"]))
+	y := int(math.Round(m["m01"] / m["m00"]))
+	return image.Point{X: x, Y: y}
+}
+
 func (sample *Sample) Save(dir, filename string, show bool) string {
 	filename = strings.ReplaceAll(filename, " ", "_")
 	filepath := fmt.Sprintf("%s-%s.png", path.Join(dir, filename), uuid.New().String()[:8])
