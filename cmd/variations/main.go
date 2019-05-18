@@ -254,11 +254,12 @@ func main() {
 				log.Println(fmt.Sprintf("empty matrix %s of values %f", ft, mat.Min(hm)))
 				continue
 			}
-			canvas, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Within User %d", ft, userId))
+			canvas, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Within User %03d", ft, userId))
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := savePlot(canvas, dir, startString+ft.String()+".png"); err != nil {
+			filename := startString + fmt.Sprintf("user%03d", userId) + ft.String() + ".png"
+			if err := savePlot(canvas, dir, filename); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -281,7 +282,8 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := savePlot(canvas, "res", startString+ft.String()+".png"); err != nil {
+			filename := startString + ft.String() + ".png"
+			if err := savePlot(canvas, "res", filename); err != nil {
 				log.Fatal(err)
 			}
 		}
