@@ -177,13 +177,16 @@ func (sg *SampleGrid) Save(dir, filename string, show bool) {
 	for r := 0; r < int(sg.config.rows); r++ {
 		sample := sg.At(r, -1)
 		sample.Save(dir, fmt.Sprintf("%s-row%d", filename, r), show)
+		sample.Close()
 		for c := 0; c < int(sg.config.cols); c++ {
 			sample := sg.At(r, c)
 			sample.Save(dir, fmt.Sprintf("%s-col%d_row%d", filename, c, r), show)
+			sample.Close()
 		}
 	}
 	for c := 0; c < int(sg.config.cols); c++ {
 		sample := sg.At(-1, c)
 		sample.Save(dir, fmt.Sprintf("%s-col%d", filename, c), show)
+		sample.Close()
 	}
 }

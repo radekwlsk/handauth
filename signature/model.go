@@ -300,7 +300,9 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	for rc, ftrMap := range model.grid {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
-				ftr.Update(sampleGrid.At(rc[0], rc[1]), nSamples)
+				s := sampleGrid.At(rc[0], rc[1])
+				ftr.Update(s, nSamples)
+				s.Close()
 			}
 		}
 	}
@@ -308,7 +310,9 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	for r, ftrMap := range model.row {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
-				ftr.Update(sampleGrid.At(r, -1), nSamples)
+				s := sampleGrid.At(r, -1)
+				ftr.Update(s, nSamples)
+				s.Close()
 			}
 		}
 	}
@@ -316,7 +320,9 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	for c, ftrMap := range model.col {
 		for ftrType, ftr := range ftrMap {
 			if features.FeatureFlags[ftrType] {
-				ftr.Update(sampleGrid.At(-1, c), nSamples)
+				s := sampleGrid.At(-1, c)
+				ftr.Update(s, nSamples)
+				s.Close()
 			}
 		}
 	}
