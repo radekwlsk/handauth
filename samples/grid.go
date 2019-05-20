@@ -59,12 +59,12 @@ func (gc GridConfig) GoString() string {
 }
 
 func calcOverlappingGridSize(height, width float64, rows, cols uint16) (h, w, ys, xs uint16) {
-	w = uint16(math.Floor((10 * width) / (float64(3*cols) + 7)))
+	w = uint16(math.Ceil((10 * width) / (float64(3*cols) + 7)))
 	xs = uint16(math.Floor(0.3 * float64(w)))
 	if float64(xs*(cols-1)) > width {
 		panic(fmt.Sprintf("decrease number of columns or stride value"))
 	}
-	h = uint16(math.Floor((10 * height) / (float64(3*rows) + 7)))
+	h = uint16(math.Ceil((10 * height) / (float64(3*rows) + 7)))
 	ys = uint16(math.Floor(0.3 * float64(h)))
 	if h <= 5 {
 		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
