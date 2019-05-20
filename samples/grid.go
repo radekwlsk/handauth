@@ -66,10 +66,10 @@ func calcOverlappingGridSize(height, width float64, rows, cols uint16) (h, w, ys
 	}
 	h = uint16(math.Ceil((10 * height) / (float64(3*rows) + 7)))
 	ys = uint16(math.Floor(0.3 * float64(h)))
-	if h <= 5 {
+	if h <= 3 {
 		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
 	}
-	if w <= 5 {
+	if w <= 3 {
 		panic(fmt.Sprintf("decrease number of columns (%.0f, %.0f)", height, width))
 	}
 	return h, w, ys, xs
@@ -78,10 +78,10 @@ func calcOverlappingGridSize(height, width float64, rows, cols uint16) (h, w, ys
 func calcGridSize(height, width float64, rows, cols uint16) (h, w uint16) {
 	h = uint16(math.Floor(float64(height) / float64(rows)))
 	w = uint16(math.Floor(float64(width) / float64(cols)))
-	if h <= 3 {
+	if h <= 1 {
 		panic(fmt.Sprintf("decrease number of rows (%.0f, %.0f)", height, width))
 	}
-	if w <= 3 {
+	if w <= 1 {
 		panic(fmt.Sprintf("decrease number of columns (%.0f, %.0f)", height, width))
 	}
 	return h, w
