@@ -93,8 +93,10 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 		basic = features.FeatureMap{
 			features.LengthFeatureType:   features.NewLengthFeature(),
 			features.GradientFeatureType: features.NewGradientFeature(),
-			features.HOGFeatureType:      features.NewHOGFeature(),
-			features.AspectFeatureType:   features.NewAspectFeature(),
+			//features.HOGFeatureType:      features.NewHOGFeature(),
+			features.AspectFeatureType:      features.NewAspectFeature(),
+			features.MassCenterXFeatureType: features.NewMassCenterFeature(features.XMassCenter),
+			features.MassCenterYFeatureType: features.NewMassCenterFeature(features.YMassCenter),
 		}
 	}
 	if AreaFlags[GridAreaType] {
@@ -112,8 +114,8 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 		row = make(RowFeatureMap)
 		for _, r := range rowKeys {
 			row[r] = features.FeatureMap{
-				features.LengthFeatureType:   features.NewLengthFeature(),
-				features.HOGFeatureType:      features.NewHOGFeature(),
+				features.LengthFeatureType: features.NewLengthFeature(),
+				//features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
 				features.CornersFeatureType:  features.NewCornersFeature(),
 			}
@@ -123,8 +125,8 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 		col = make(ColFeatureMap)
 		for _, c := range colKeys {
 			col[c] = features.FeatureMap{
-				features.LengthFeatureType:   features.NewLengthFeature(),
-				features.HOGFeatureType:      features.NewHOGFeature(),
+				features.LengthFeatureType: features.NewLengthFeature(),
+				//features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
 				features.CornersFeatureType:  features.NewCornersFeature(),
 			}

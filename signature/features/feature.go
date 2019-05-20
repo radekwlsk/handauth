@@ -9,11 +9,13 @@ import (
 )
 
 var FeatureFlags = map[FeatureType]bool{
-	LengthFeatureType:   true,
-	GradientFeatureType: true,
-	AspectFeatureType:   true,
-	HOGFeatureType:      true,
-	CornersFeatureType:  true,
+	LengthFeatureType:      true,
+	GradientFeatureType:    true,
+	AspectFeatureType:      true,
+	HOGFeatureType:         true,
+	CornersFeatureType:     false,
+	MassCenterXFeatureType: true,
+	MassCenterYFeatureType: true,
 }
 
 type FeatureType int
@@ -25,6 +27,8 @@ func (t FeatureType) String() string {
 		"AspectFeature",
 		"HOGFeature",
 		"CornersFeature",
+		"MassCenterXFeature",
+		"MassCenterYFeature",
 	}[t]
 }
 
@@ -34,6 +38,8 @@ const (
 	AspectFeatureType
 	HOGFeatureType
 	CornersFeatureType
+	MassCenterXFeatureType
+	MassCenterYFeatureType
 )
 
 type Feature struct {
