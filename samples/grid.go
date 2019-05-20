@@ -2,6 +2,7 @@ package samples
 
 import (
 	"fmt"
+	"gocv.io/x/gocv"
 	"image"
 	"math"
 	"sync"
@@ -23,11 +24,15 @@ func (sg *SampleGrid) At(row, col int) *Sample {
 	}
 
 	sg.mutex.Lock()
-	defer sg.mutex.Unlock()
 
 	region := sg.sample.mat.Region(rect2)
+	mat := gocv.NewMat()
+	region.CopyTo(&mat)
+
+	sg.mutex.Unlock()
+
 	s := &Sample{
-		mat:    region,
+		mat:    mat,
 		height: sg.config.fieldHeight,
 		width:  sg.config.fieldWidth,
 		ratio:  float64(region.Cols()) / float64(region.Rows()),
