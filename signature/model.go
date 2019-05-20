@@ -22,7 +22,7 @@ var AreaFlags = map[AreaType]bool{
 }
 
 type UserModel struct {
-	Id    uint8
+	Id    uint16
 	Model *Model
 }
 

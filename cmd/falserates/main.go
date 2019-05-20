@@ -35,10 +35,19 @@ var (
 )
 
 func configRecords() [][]string {
+	var dataset string
+	switch cmd.Resources {
+	case cmd.GPDSResources:
+		dataset = fmt.Sprintf("GPDS%d", *flags.GPDSUsers)
+		break
+	default:
+		dataset = fmt.Sprintf("%s", cmd.Resources)
+	}
 	config := [][]string{
 		{"message", testMessage},
 		{"date", start.String()},
 		{"full data", fmt.Sprintf("%v", fullResources)},
+		{"dataset", dataset},
 		{"cols", fmt.Sprintf("%d", *flags.Cols)},
 		{"rows", fmt.Sprintf("%d", *flags.Rows)},
 		{"split", fmt.Sprintf("%.2f", split)},
@@ -67,6 +76,9 @@ func main() {
 	flag.StringVar(&testMessage, "m", "", "message to be associated with a test")
 	flag.Parse()
 	cmd.UseFullResources = fullResources
+	if *flags.GPDSUsers > 0 {
+		cmd.Resources = cmd.GPDSResources
+	}
 
 	start = time.Now()
 	startString = start.Format(TestStartTimeFormat)
@@ -108,7 +120,7 @@ func main() {
 	genuineSamplesUsers := cmd.GenuineUsers(fullResources)
 	forgerySamplesUsers := cmd.ForgeryUsers(fullResources)
 
-	users := map[uint8]*signature.UserModel{}
+	users := map[uint16]*signature.UserModel{}
 	{
 		start := time.Now()
 		featuresChan := make(chan *signature.UserModel)
@@ -116,7 +128,7 @@ func main() {
 		for user, samples := range genuineSamplesUsers {
 			enrollSplit := math.Ceil(float64(len(samples)) * split)
 			enrollSamples := samples[:int(enrollSplit)]
-			go cmd.EnrollUserSync(uint8(user), enrollSamples, uint16(*flags.Rows), uint16(*flags.Cols), featuresChan)
+			go cmd.EnrollUserSync(uint16(user), enrollSamples, uint16(*flags.Rows), uint16(*flags.Cols), featuresChan)
 		}
 
 		for range genuineSamplesUsers {
@@ -201,9 +213,9 @@ func main() {
 
 		for forgerUser, samples := range forgerySamplesUsers {
 			go cmd.VerifyUserSync(
-				uint8(forgerUser[0]),
+				uint16(forgerUser[0]),
 				samples,
-				users[uint8(forgerUser[1])],
+				users[uint16(forgerUser[1])],
 				thresholds,
 				thresholdWeights,
 				forgeriesResultsChan,

@@ -63,7 +63,7 @@ var blackRGBA = color.RGBA{A: 255}
 var redRGBA = color.RGBA{R: 255, A: 255}
 
 func mergedSamples(id int) *image.RGBA {
-	sample, err := cmd.ReadUserSample(uint8(id), uint8(id), uint8(samplesUsers[id][0]))
+	sample, err := cmd.ReadUserSample(uint16(id), uint16(id), uint8(samplesUsers[id][0]))
 	if err != nil {
 		panic(err)
 	}
@@ -88,7 +88,7 @@ func mergedSamples(id int) *image.RGBA {
 
 	var massCenters []image.Point
 	for i, sampleId := range samplesUsers[id] {
-		sample, err := cmd.ReadUserSample(uint8(id), uint8(id), uint8(sampleId))
+		sample, err := cmd.ReadUserSample(uint16(id), uint16(id), uint8(sampleId))
 		if err != nil {
 			panic(err)
 		}

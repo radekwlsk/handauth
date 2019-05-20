@@ -159,38 +159,40 @@ func variationBetweenUsers() map[features.FeatureType]*mat.Dense {
 		features.CornersFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
 	}
 
-	users := map[uint8]*signature.UserModel{}
+	var models []*signature.UserModel
 	{
 		featuresChan := make(chan *signature.UserModel)
 
 		for user, samples := range samplesUsers {
-			go cmd.EnrollUserSync(uint8(user), samples, uint16(*flags.Rows), uint16(*flags.Cols), featuresChan)
+			for _, sampleId := range samples {
+				go cmd.EnrollUserSync(uint16(user), []int{sampleId}, uint16(*flags.Rows), uint16(*flags.Cols),
+					featuresChan)
+			}
 		}
 
-		for range samplesUsers {
-			f := <-featuresChan
-			if f.Model != nil {
-				users[f.Id] = f
-				if *flags.VVerbose {
-					log.Printf("\tEnrolled user %03d\n", f.Id)
+		for _, samples := range samplesUsers {
+			for range samples {
+				f := <-featuresChan
+				if f.Model != nil {
+					models = append(models, f)
 				}
 			}
 		}
 		close(featuresChan)
 	}
+
 	for r := 0; r < *flags.Rows; r++ {
 		for c := 0; c < *flags.Cols; c++ {
 			for ftrType := range heatMaps {
-				vector := make([]float64, 0)
-				for _, user := range users {
-					ftr := user.Model.Grid(r, c)[ftrType]
-					vector = append(vector, ftr.Value())
+				vector := make([]float64, len(models))
+				for i, model := range models {
+					ftr := model.Model.Grid(r, c)[ftrType]
+					vector[i] = ftr.Value()
 				}
 				heatMaps[ftrType].Set(r, c, stat.Variance(vector, nil))
 			}
 		}
 	}
-
 	return heatMaps
 }
 
@@ -202,7 +204,7 @@ func variationWithinUser(id int) map[features.FeatureType]*mat.Dense {
 		features.CornersFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
 	}
 
-	userModel := cmd.EnrollUser(uint8(id), samplesUsers[id], uint16(*flags.Rows), uint16(*flags.Cols))
+	userModel := cmd.EnrollUser(uint16(id), samplesUsers[id], uint16(*flags.Rows), uint16(*flags.Cols))
 	for r := 0; r < *flags.Rows; r++ {
 		for c := 0; c < *flags.Cols; c++ {
 			for ftrType := range heatMaps {
