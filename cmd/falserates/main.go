@@ -89,6 +89,9 @@ func main() {
 
 	{
 		workingDir, _ = os.Getwd()
+		if !strings.HasSuffix(outFileName, ".csv") {
+			outFileName += ".csv"
+		}
 		file, err := os.Create(path.Join(workingDir, "res", startString+"_"+outFileName))
 		if err != nil {
 			panic(err)
