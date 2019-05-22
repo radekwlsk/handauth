@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"gocv.io/x/gocv"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
 	"image"
 	"image/color"
 	"image/png"
@@ -93,15 +95,15 @@ func (sample *Sample) read(name string) error {
 }
 
 func (sample *Sample) Preprocess(ratio float64) {
-	sample.normalize()
+	sample.Normalize()
 	if Debug {
 		sample.Save("res", "normalized", false)
 	}
-	sample.foreground()
+	sample.Foreground()
 	if Debug {
 		sample.Save("res", "foreground", false)
 	}
-	sample.crop()
+	sample.Crop()
 	if Debug {
 		sample.Save("res", "cropped", false)
 	}
@@ -123,7 +125,7 @@ func (sample *Sample) Update() {
 	sample.ratio = float64(sample.width) / float64(sample.height)
 }
 
-func (sample *Sample) normalize() {
+func (sample *Sample) Normalize() {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
@@ -141,7 +143,7 @@ func (sample *Sample) normalize() {
 	sample.mat = dst
 }
 
-func (sample *Sample) foreground() {
+func (sample *Sample) Foreground() {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
@@ -186,7 +188,7 @@ func (sample *Sample) zhangSuen() {
 	sample.mat = dst
 }
 
-func (sample *Sample) crop() {
+func (sample *Sample) Crop() {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
