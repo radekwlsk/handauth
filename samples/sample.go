@@ -263,6 +263,49 @@ func (sample *Sample) Save(dir, filename string, show bool) string {
 	return filepath
 }
 
+type histXYer struct {
+	vals []float64
+}
+
+func (h histXYer) Increment(i int) {
+	h.vals[i] += 1
+}
+
+func (h histXYer) Len() int {
+	return len(h.vals)
+}
+
+func (h histXYer) XY(i int) (x, y float64) {
+	return float64(i), h.vals[i]
+}
+
+func (sample *Sample) Histogram(dir, filename string, bins int) error {
+	vals := histXYer{make([]float64, 256)}
+	matVals := sample.mat.DataPtrUint8()
+	for _, v := range matVals {
+		vals.Increment(int(v))
+	}
+
+	p, err := plot.New()
+	if err != nil {
+		return err
+	}
+	p.Title.Text = "Histogram"
+	h, err := plotter.NewHistogram(vals, bins)
+	if err != nil {
+		return err
+	}
+	h.Normalize(1)
+	p.Add(h)
+	if !strings.HasSuffix(filename, ".png") && !strings.HasSuffix(filename, ".jpg") {
+		filename += ".png"
+	}
+	if err = p.Save(480, 320, path.Join(dir, filename)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (sample *Sample) GoString() string {
 	return fmt.Sprintf(
 		"<%T %dx%d area %d>",
