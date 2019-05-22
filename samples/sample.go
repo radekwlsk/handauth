@@ -147,7 +147,8 @@ func (sample *Sample) Foreground() {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
-	gocv.Threshold(sample.mat, &dst, 0.0, 255.0, gocv.ThresholdBinaryInv+gocv.ThresholdOtsu)
+	gocv.GaussianBlur(sample.mat, &dst, image.Pt(3, 3), 0, 0, gocv.BorderReplicate)
+	gocv.Threshold(dst, &dst, 0.0, 255.0, gocv.ThresholdBinaryInv+gocv.ThresholdOtsu)
 
 	_ = sample.mat.Close()
 	sample.mat = dst
