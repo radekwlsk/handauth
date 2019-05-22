@@ -12,9 +12,6 @@ import (
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/palette/brewer"
 	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
-	"gonum.org/v1/plot/vg/vgimg"
 	"log"
 	"math"
 	"os"
@@ -68,19 +65,19 @@ func (integerTicks) Ticks(min, max float64) []plot.Tick {
 	return t
 }
 
-func plotHeatmap(data *mat.Dense, title string) (*vgimg.Canvas, error) {
+func plotHeatmap(data *mat.Dense, title string) (*plot.Plot, error) {
 	m := Grid{
 		Data: data,
 	}
 	pal, err := brewer.GetPalette(brewer.TypeSequential, "BuPu", 9)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	h := plotter.NewHeatMap(m, pal)
 
 	p, err := plot.New()
 	if err != nil {
-		log.Panic(err)
+		return nil, err
 	}
 	p.Title.Text = title
 	p.X.Tick.Marker = integerTicks{}
@@ -116,31 +113,16 @@ func plotHeatmap(data *mat.Dense, title string) (*vgimg.Canvas, error) {
 		r, c := data.Dims()
 		p.X.Max, p.Y.Max = float64(c), float64(r)
 	}
-
-	img := vgimg.New(720, 480)
-	dc := draw.New(img)
-
 	l.Top = true
-	// Calculate the width of the legend.
-	r := l.Rectangle(dc)
-	legendWidth := r.Max.X - r.Min.X
-	l.YOffs = -p.Title.Font.Extents().Height // Adjust the legend down a little.
+	l.YOffs = -p.Title.Font.Extents().Height
+	p.Legend = l
 
-	l.Draw(dc)
-	dc = draw.Crop(dc, 0, -legendWidth-vg.Millimeter, 0, 0) // Make space for the legend.
-	p.Draw(dc)
-
-	return img, nil
+	return p, nil
 }
 
-func savePlot(canvas *vgimg.Canvas, dir, filename string) error {
-	w, err := os.Create(path.Join(dir, filename))
+func savePlot(p *plot.Plot, dir, filename string) error {
+	err := p.Save(720, 480, path.Join(dir, filename))
 	if err != nil {
-		return err
-	}
-	defer w.Close()
-	png := vgimg.PngCanvas{Canvas: canvas}
-	if _, err = png.WriteTo(w); err != nil {
 		return err
 	}
 	return nil
@@ -231,6 +213,9 @@ func main() {
 		startString = start.Format(TestStartTimeFormat) + "_"
 	}
 
+	if userId > 0 {
+		fullResources = true
+	}
 	samplesUsers = cmd.GenuineUsers(fullResources)
 	if _, ok := samplesUsers[userId]; userId > 0 && !ok {
 		log.Fatal("No such user")
@@ -256,12 +241,12 @@ func main() {
 				log.Println(fmt.Sprintf("empty matrix %s of values %f", ft, mat.Min(hm)))
 				continue
 			}
-			canvas, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Within User %03d", ft, userId))
+			plt, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Within User %03d", ft, userId))
 			if err != nil {
 				log.Fatal(err)
 			}
 			filename := startString + fmt.Sprintf("user%03d", userId) + ft.String() + ".png"
-			if err := savePlot(canvas, dir, filename); err != nil {
+			if err = plt.Save(720, 480, path.Join(dir, filename)); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -280,12 +265,12 @@ func main() {
 				log.Println(fmt.Sprintf("empty matrix %s of values %f", ft, mat.Min(hm)))
 				continue
 			}
-			canvas, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Between Users", ft))
+			plt, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Between Users", ft))
 			if err != nil {
 				log.Fatal(err)
 			}
 			filename := startString + ft.String() + ".png"
-			if err := savePlot(canvas, "res", filename); err != nil {
+			if err = plt.Save(720, 480, path.Join("res", filename)); err != nil {
 				log.Fatal(err)
 			}
 		}
