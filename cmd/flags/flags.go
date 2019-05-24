@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	GPDSUsers           = flag.Int("gpds", -1, "use GPDS synthetic dataset with n users")
+	GPDSUsers           = flag.Int("gpds", 100, "amount of GPDS users to use if flag res = 1")
+	Resources           = flag.Int("res", 0, "resources type 0 - SigComp, 1 - GPDS, 2 - MCYT")
 	verbose             = flag.Bool("v", false, "print basic messages")
 	VVerbose            = flag.Bool("vv", false, "print additional execution messages")
 	Cols                = flag.Int("cols", ColsDefault, "columns in grid")

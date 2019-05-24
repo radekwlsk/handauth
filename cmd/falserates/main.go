@@ -36,12 +36,23 @@ var (
 
 func configRecords() [][]string {
 	var dataset string
-	switch cmd.Resources {
+	switch cmd.ResourceType(*flags.Resources) {
 	case cmd.GPDSResources:
 		dataset = fmt.Sprintf("GPDS%d", *flags.GPDSUsers)
 		break
+	case cmd.SigCompResources:
+		var f string
+		if fullResources {
+			f = "Full"
+		} else {
+			f = "Test"
+		}
+		dataset = fmt.Sprintf("SigComp%s", f)
+	case cmd.MCYTResources:
+		dataset = fmt.Sprintf("MCYT")
+		break
 	default:
-		dataset = fmt.Sprintf("%s", cmd.Resources)
+		log.Fatalf("no such dataset: %d", cmd.ResourceType(*flags.Resources))
 	}
 	config := [][]string{
 		{"message", testMessage},
@@ -71,14 +82,11 @@ func configRecords() [][]string {
 
 func main() {
 	flag.Float64Var(&split, "split", SplitDefault, "enroll/test data split ratio")
-	flag.BoolVar(&fullResources, "full", false, "run test on full dataset")
+	flag.BoolVar(&fullResources, "full", false, "run test on full SigComp dataset if flag res = 0")
 	flag.StringVar(&outFileName, "o", "out.csv", "output file")
 	flag.StringVar(&testMessage, "m", "", "message to be associated with a test")
 	flag.Parse()
 	cmd.UseFullResources = fullResources
-	if *flags.GPDSUsers > 0 {
-		cmd.Resources = cmd.GPDSResources
-	}
 
 	start = time.Now()
 	startString = start.Format(TestStartTimeFormat)

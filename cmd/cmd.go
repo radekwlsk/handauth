@@ -6,45 +6,66 @@ import (
 	"github.com/radekwlsk/handauth/samples"
 	"github.com/radekwlsk/handauth/signature"
 	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
-const ResourcesSigCompFullGenuinePath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/genuines/full/"
-const ResourcesSigCompTestGenuinePath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/genuines/test/"
-const ResourcesSigCompFullForgeryPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/forgeries/full/"
-const ResourcesSigCompTestForgeryPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/forgeries/test/"
-const ResourcesGPDSPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/gpds/"
+const ResourcesSigCompPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/sigcomp/"
 const FileNameFormatSigComp = "NFI-%03d%02d%03d.png"
+
+const ResourcesGPDSPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/gpds/"
 const FileNameFormatGPDS = "%s-%03d-%02d.jpg"
 
-type ResourceType string
+const ResourcesMCYTPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/mcyt/"
+const FileNameFormatMCYT = "%04d%s%02d.bmp"
+
+type ResourceType int
 
 const (
-	GPDSResources    ResourceType = "GPDS"
-	SigCompResources ResourceType = "SigComp"
+	SigCompResources ResourceType = iota
+	GPDSResources
+	MCYTResources
 )
 
 var UseFullResources = true
-var Resources = SigCompResources
 
 func readSigCompUserSample(creator, user uint16, index uint8) (*samples.UserSample, error) {
-	var resPath string
+	resPath := ResourcesSigCompPath
 	if creator == user {
-		if UseFullResources {
-			resPath = ResourcesSigCompFullGenuinePath
-		} else {
-			resPath = ResourcesSigCompTestGenuinePath
-		}
+		resPath = path.Join(resPath, "genuines")
 	} else {
-		if UseFullResources {
-			resPath = ResourcesSigCompFullForgeryPath
-		} else {
-			resPath = ResourcesSigCompTestForgeryPath
-		}
+		resPath = path.Join(resPath, "forgeries")
+	}
+	if UseFullResources {
+		resPath = path.Join(resPath, "full")
+	} else {
+		resPath = path.Join(resPath, "test")
 	}
 	filePath := path.Join(resPath, fmt.Sprintf(FileNameFormatSigComp, creator, index, user))
 	userName := fmt.Sprintf("%02d", user)
+	sample, err := samples.NewUserSample(userName, filePath)
+	if err != nil {
+		return nil, err
+	} else {
+		return sample, nil
+	}
+}
+
+func readMCYTUserSample(creator, user uint16, index uint8) (*samples.UserSample, error) {
+	resPath := path.Join(ResourcesMCYTPath, fmt.Sprintf("%04d", user))
+	var prefix, label string
+	if creator == user {
+		label = "v"
+		prefix = ""
+	} else {
+		label = "f"
+		prefix = fmt.Sprintf("%04d_", creator)
+	}
+	filePath := path.Join(resPath, prefix+fmt.Sprintf(FileNameFormatMCYT, user, label, index))
+	userName := fmt.Sprintf("%04d", user)
 	sample, err := samples.NewUserSample(userName, filePath)
 	if err != nil {
 		return nil, err
@@ -75,14 +96,16 @@ func readGPDSUserSample(user uint16, index uint8, forgery bool) (*samples.UserSa
 }
 
 func ReadUserSample(creator, user uint16, index uint8) (*samples.UserSample, error) {
-	switch Resources {
+	switch ResourceType(*flags.Resources) {
 	case SigCompResources:
 		return readSigCompUserSample(creator, user, index)
 	case GPDSResources:
 		forgery := creator != user
 		return readGPDSUserSample(user, index, forgery)
+	case MCYTResources:
+		return readMCYTUserSample(creator, user, index)
 	default:
-		panic(fmt.Sprintf("no such resources: %v", Resources))
+		panic(fmt.Sprintf("no such resources: %v", ResourceType(*flags.Resources)))
 	}
 }
 
@@ -208,14 +231,15 @@ func (s *VerificationStat) Count(t float64) int {
 
 func GenuineUsers(full bool) map[int][]int {
 	genuineSamplesUsers := make(map[int][]int)
-	switch Resources {
+	switch ResourceType(*flags.Resources) {
 	case SigCompResources:
-		var genuinePath string
+		genuinePath := path.Join(ResourcesSigCompPath, "genuines")
 		if full {
-			genuinePath = ResourcesSigCompFullGenuinePath
+			genuinePath = path.Join(genuinePath, "full")
 		} else {
-			genuinePath = ResourcesSigCompTestGenuinePath
+			genuinePath = path.Join(genuinePath, "test")
 		}
+
 		files, err := ioutil.ReadDir(genuinePath)
 		if err != nil {
 			panic("couldn't read files")
@@ -238,6 +262,35 @@ func GenuineUsers(full bool) map[int][]int {
 			}
 		}
 		break
+	case MCYTResources:
+		err := filepath.Walk(ResourcesMCYTPath,
+			func(path string, f os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !f.IsDir() {
+					if strings.Contains(f.Name(), "v") {
+						user, err := strconv.Atoi(f.Name()[0:4])
+						if err != nil {
+							panic("wrong user id position")
+						}
+						sample, err := strconv.Atoi(f.Name()[5:7])
+						if err != nil {
+							panic("wrong sample id position")
+						}
+						if _, ok := genuineSamplesUsers[user]; ok {
+							genuineSamplesUsers[user] = append(genuineSamplesUsers[user], sample)
+						} else {
+							genuineSamplesUsers[user] = []int{sample}
+						}
+					}
+				}
+				return nil
+			})
+		if err != nil {
+			panic("couldn't read files")
+		}
+		break
 	case GPDSResources:
 		for i := 0; i < *flags.GPDSUsers; i++ {
 			ss := make([]int, 24)
@@ -252,13 +305,13 @@ func GenuineUsers(full bool) map[int][]int {
 
 func ForgeryUsers(full bool) map[[2]int][]int {
 	forgerySamplesUsers := make(map[[2]int][]int)
-	switch Resources {
+	switch ResourceType(*flags.Resources) {
 	case SigCompResources:
-		var forgeryPath string
+		forgeryPath := path.Join(ResourcesSigCompPath, "forgeries")
 		if full {
-			forgeryPath = ResourcesSigCompFullForgeryPath
+			forgeryPath = path.Join(forgeryPath, "full")
 		} else {
-			forgeryPath = ResourcesSigCompTestForgeryPath
+			forgeryPath = path.Join(forgeryPath, "test")
 		}
 		files, err := ioutil.ReadDir(forgeryPath)
 		if err != nil {
@@ -285,6 +338,40 @@ func ForgeryUsers(full bool) map[[2]int][]int {
 					forgerySamplesUsers[key] = []int{sample}
 				}
 			}
+		}
+		break
+	case MCYTResources:
+		err := filepath.Walk(ResourcesMCYTPath,
+			func(path string, f os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !f.IsDir() {
+					if strings.Contains(f.Name(), "f") {
+						forger, err := strconv.Atoi(f.Name()[0:4])
+						if err != nil {
+							panic("wrong forger id position")
+						}
+						user, err := strconv.Atoi(f.Name()[5:9])
+						if err != nil {
+							panic("wrong user id position")
+						}
+						sample, err := strconv.Atoi(f.Name()[10:12])
+						if err != nil {
+							panic("wrong sample id position")
+						}
+						key := [2]int{forger, user}
+						if _, ok := forgerySamplesUsers[key]; ok {
+							forgerySamplesUsers[key] = append(forgerySamplesUsers[key], sample)
+						} else {
+							forgerySamplesUsers[key] = []int{sample}
+						}
+					}
+				}
+				return nil
+			})
+		if err != nil {
+			panic("couldn't read files")
 		}
 		break
 	case GPDSResources:
