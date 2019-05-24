@@ -116,7 +116,7 @@ func (sample *Sample) Preprocess(ratio float64) {
 		sample.Save("res", "thinned", false)
 	}
 	//sample.toLines()
-	//if Debug { sample.Save("res", "lines approximated", false) }
+	//if Debug { sample.Save("res", "lines", false) }
 }
 
 func (sample *Sample) Update() {
@@ -198,8 +198,14 @@ func (sample *Sample) Crop() {
 	for _, c := range contours[1:] {
 		rect = rect.Union(gocv.BoundingRect(c))
 	}
-	dst = sample.mat.Region(rect)
+	if rect.Empty() {
+		log.Fatal("cropping yields empty matrix")
+	}
 
+	region := sample.mat.Region(rect)
+	region.CopyTo(&dst)
+
+	_ = region.Close()
 	_ = sample.mat.Close()
 	sample.mat = dst
 }
@@ -231,7 +237,11 @@ func (sample *Sample) CenterOfMass() image.Point {
 
 func (sample *Sample) Save(dir, filename string, show bool) string {
 	filename = strings.ReplaceAll(filename, " ", "_")
-	filepath := fmt.Sprintf("%s-%s.png", path.Join(dir, filename), uuid.New().String()[:8])
+	filename = fmt.Sprintf("%s-%s", filename, uuid.New().String()[:8])
+	if !strings.HasSuffix(filename, ".png") {
+		filename = fmt.Sprintf("%s.png", filename)
+	}
+	filepath := path.Join(dir, filename)
 	f, err := os.Create(filepath)
 	if err != nil {
 		log.Println(err)
