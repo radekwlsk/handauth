@@ -48,6 +48,11 @@ func NewSample(filename string) (*Sample, error) {
 	return s, err
 }
 
+func (sample *Sample) Load(mat gocv.Mat) {
+	sample.mat = mat
+	sample.Update()
+}
+
 func (sample *Sample) Copy() *Sample {
 	return &Sample{
 		mat:    sample.mat.Clone(),
