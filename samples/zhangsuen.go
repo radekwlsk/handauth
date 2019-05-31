@@ -25,7 +25,7 @@ func ZhangSuen(src gocv.Mat, dst *gocv.Mat) {
 		s1Marks := make([][2]int, 0)
 		for r := 0; r < rows; r++ {
 			for c := 0; c < cols; c++ {
-				if step1ConditionsMet(grayImg, r, c) {
+				if grayImg.At(c, r) == WhiteGoCV && step1ConditionsMet(grayImg, r, c) {
 					s1Marks = append(s1Marks, [2]int{r, c})
 				}
 			}
@@ -40,7 +40,7 @@ func ZhangSuen(src gocv.Mat, dst *gocv.Mat) {
 		s2Marks := make([][2]int, 0)
 		for r := 0; r < rows; r++ {
 			for c := 0; c < cols; c++ {
-				if step2ConditionsMet(grayImg, r, c) {
+				if grayImg.At(c, r) == WhiteGoCV && step2ConditionsMet(grayImg, r, c) {
 					s2Marks = append(s2Marks, [2]int{r, c})
 				}
 			}
@@ -58,13 +58,13 @@ func ZhangSuen(src gocv.Mat, dst *gocv.Mat) {
 }
 
 func step1ConditionsMet(image image.Image, row, col int) bool {
-	n := getNeighbours(image, row, col)
-	return basicConditionsMet(n) && !(n[1] && n[3] && n[5]) && !(n[3] && n[5] && n[7])
+	ns := getNeighbours(image, row, col)
+	return basicConditionsMet(ns) && !(ns[0] && ns[2] && ns[4]) && !(ns[2] && ns[4] && ns[6])
 }
 
 func step2ConditionsMet(image image.Image, row, col int) bool {
-	n := getNeighbours(image, row, col)
-	return basicConditionsMet(n) && !(n[1] && n[3] && n[7]) && !(n[1] && n[5] && n[7])
+	ns := getNeighbours(image, row, col)
+	return basicConditionsMet(ns) && !(ns[0] && ns[2] && ns[6]) && !(ns[0] && ns[4] && ns[6])
 }
 
 func getNeighbours(image image.Image, row, col int) []bool {
@@ -86,8 +86,7 @@ func getNeighbours(image image.Image, row, col int) []bool {
 		x1 = cols - 1
 	}
 
-	var p1, p2, p3, p4, p5, p6, p7, p8, p9 bool
-	p1 = image.At(col, row) == WhiteGoCV
+	var p2, p3, p4, p5, p6, p7, p8, p9 bool
 	if row != rows-1 {
 		p6 = image.At(col, y1) == WhiteGoCV
 		if col != 0 {
@@ -111,7 +110,6 @@ func getNeighbours(image image.Image, row, col int) []bool {
 		}
 	}
 	return []bool{
-		p1,
 		p2,
 		p3,
 		p4,
@@ -123,27 +121,24 @@ func getNeighbours(image image.Image, row, col int) []bool {
 	}
 }
 
-func basicConditionsMet(n []bool) bool {
-	a := transitions(n)
-	b := nonZero(n)
-	return n[0] && b >= 2 && b <= 6 && a == 1
+func basicConditionsMet(ns []bool) bool {
+	b := nonZero(ns)
+	return b >= 2 && b <= 6 && transitions(ns) == 1
 }
 
-func transitions(n []bool) int {
-	p := n[1]
+func transitions(ns []bool) int {
 	count := 0
-	for _, n := range []bool{n[2], n[3], n[4], n[5], n[6], n[7], n[8], n[1]} {
-		if p && !n {
+	for i, n := range ns {
+		if n && !ns[(i+1)%8] {
 			count++
 		}
-		p = n
 	}
 	return count
 }
 
-func nonZero(n []bool) int {
+func nonZero(ns []bool) int {
 	count := 0
-	for _, n := range []bool{n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[8]} {
+	for _, n := range ns {
 		if !n {
 			count++
 		}
