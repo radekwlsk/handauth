@@ -116,11 +116,11 @@ func (sample *Sample) Preprocess(ratio float64) {
 	if Debug {
 		sample.Save("res", "resized", false)
 	}
-	sample.zhangSuen()
+	sample.ZhangSuen()
 	if Debug {
 		sample.Save("res", "thinned", false)
 	}
-	//sample.toLines()
+	//sample.ToLines()
 	//if Debug { sample.Save("res", "lines", false) }
 }
 
@@ -159,7 +159,7 @@ func (sample *Sample) Foreground() {
 	sample.mat = dst
 }
 
-func (sample *Sample) toLines() {
+func (sample *Sample) ToLines() {
 	matLines := gocv.NewMat()
 	defer matLines.Close()
 	dst := gocv.NewMatWithSize(sample.Height(), sample.Width(), 0)
@@ -184,7 +184,7 @@ func (sample *Sample) toLines() {
 	sample.mat = dst
 }
 
-func (sample *Sample) zhangSuen() {
+func (sample *Sample) ZhangSuen() {
 	defer sample.Update()
 	dst := gocv.NewMat()
 
