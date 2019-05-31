@@ -289,40 +289,52 @@ func (model *Model) Score(sample *samples.Sample) (Score, *Model) {
 func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	sample.Update()
 
-	for ftrType, ftr := range model.basic {
-		if features.FeatureFlags[ftrType] {
-			ftr.Update(sample, nSamples)
-		}
-	}
-
-	sampleGrid := samples.NewSampleGrid(sample, model.rows, model.cols)
-	model.gridConfig = sampleGrid.Config()
-	for rc, ftrMap := range model.grid {
-		for ftrType, ftr := range ftrMap {
+	if AreaFlags[BasicAreaType] {
+		for ftrType, ftr := range model.basic {
 			if features.FeatureFlags[ftrType] {
-				s := sampleGrid.At(rc[0], rc[1])
-				ftr.Update(s, nSamples)
-				s.Close()
+				ftr.Update(sample, nSamples)
 			}
 		}
 	}
 
-	for r, ftrMap := range model.row {
-		for ftrType, ftr := range ftrMap {
-			if features.FeatureFlags[ftrType] {
-				s := sampleGrid.At(r, -1)
-				ftr.Update(s, nSamples)
-				s.Close()
+	var sampleGrid *samples.SampleGrid
+	if AreaFlags[GridAreaType] || AreaFlags[RowAreaType] || AreaFlags[ColAreaType] {
+		sampleGrid = samples.NewSampleGrid(sample, model.rows, model.cols)
+		model.gridConfig = sampleGrid.Config()
+
+		if AreaFlags[GridAreaType] {
+			for rc, ftrMap := range model.grid {
+				for ftrType, ftr := range ftrMap {
+					if features.FeatureFlags[ftrType] {
+						s := sampleGrid.At(rc[0], rc[1])
+						ftr.Update(s, nSamples)
+						s.Close()
+					}
+				}
 			}
 		}
-	}
 
-	for c, ftrMap := range model.col {
-		for ftrType, ftr := range ftrMap {
-			if features.FeatureFlags[ftrType] {
-				s := sampleGrid.At(-1, c)
-				ftr.Update(s, nSamples)
-				s.Close()
+		if AreaFlags[RowAreaType] {
+			for r, ftrMap := range model.row {
+				for ftrType, ftr := range ftrMap {
+					if features.FeatureFlags[ftrType] {
+						s := sampleGrid.At(r, -1)
+						ftr.Update(s, nSamples)
+						s.Close()
+					}
+				}
+			}
+		}
+
+		if AreaFlags[ColAreaType] {
+			for c, ftrMap := range model.col {
+				for ftrType, ftr := range ftrMap {
+					if features.FeatureFlags[ftrType] {
+						s := sampleGrid.At(-1, c)
+						ftr.Update(s, nSamples)
+						s.Close()
+					}
+				}
 			}
 		}
 	}
