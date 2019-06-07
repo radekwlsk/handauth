@@ -38,8 +38,8 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 			if a < 0 {
 				a = a + 180.0
 			}
-			b := int(math.RoundToEven(a))
-			bins[b/2] = bins[b/2] + float64(magnitude.GetFloatAt(r, c))
+			b := int(math.Floor(a / 2.0))
+			bins[b] = bins[b] + float64(magnitude.GetFloatAt(r, c))
 		}
 	}
 	var total float64
@@ -54,7 +54,7 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 		} else {
 			weights[i] = 0.0
 		}
-		values[i] = float64(i)
+		values[i] = float64(i * 2)
 	}
 	value := stat.Mean(values, weights)
 	return value
