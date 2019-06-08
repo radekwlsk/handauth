@@ -159,25 +159,58 @@ func (sample *Sample) Foreground() {
 	sample.mat = dst
 }
 
+func pointDist(pt1, pt2 image.Point) float64 {
+	return math.Sqrt(
+		math.Pow(float64(pt1.X-pt2.X), 2) + math.Pow(float64(pt1.Y-pt2.Y), 2),
+	)
+}
+
 func (sample *Sample) ToLines() {
 	matLines := gocv.NewMat()
 	defer matLines.Close()
 	dst := gocv.NewMatWithSize(sample.Height(), sample.Width(), 0)
+	gocv.GaussianBlur(sample.mat, &dst, image.Pt(3, 3), 0, 0, gocv.BorderReplicate)
 
 	gocv.HoughLinesPWithParams(
-		sample.mat,
+		dst,
 		&matLines,
-		1,
-		math.Pi/180,
-		17,
-		3,
-		11,
+		45,
+		2*math.Pi/180,
+		50,
+		15,
+		7,
 	)
 
+	dst.Close()
+	dst = gocv.NewMatWithSize(sample.Height(), sample.Width(), 0)
+	bounds := make([][2]image.Point, 0)
 	for i := 0; i < matLines.Rows(); i++ {
 		pt1 := image.Pt(int(matLines.GetVeciAt(i, 0)[0]), int(matLines.GetVeciAt(i, 0)[1]))
 		pt2 := image.Pt(int(matLines.GetVeciAt(i, 0)[2]), int(matLines.GetVeciAt(i, 0)[3]))
-		gocv.Line(&dst, pt1, pt2, color.RGBA{R: 255, G: 255, B: 255}, 1)
+		bounds = append(bounds, [2]image.Point{pt1, pt2})
+	}
+Outer:
+	for i, pts := range bounds {
+		for j, pts2 := range bounds {
+			if i == j {
+				continue
+			}
+			rect := image.Rect(pts[0].X, pts[0].Y, pts[1].X, pts[1].Y)
+			rect2 := image.Rect(pts2[0].X, pts2[0].Y, pts2[1].X, pts2[1].Y)
+			//
+			insideOther := rect.In(rect2)
+			nearOther := (pointDist(pts[0], pts2[0]) < 11 && pointDist(pts[1], pts2[1]) < 21) ||
+				(pointDist(pts[0], pts2[0]) < 21 && pointDist(pts[1], pts2[1]) < 11)
+			nearOther2 := (pointDist(pts[0], pts2[0]) < 35 && pointDist(pts[1], pts2[1]) < 35) ||
+				(pointDist(pts[0], pts2[0]) < 35 && pointDist(pts[1], pts2[1]) < 35)
+			isShorter := pointDist(pts[0], pts[1]) < pointDist(pts2[0], pts2[1])
+			if (nearOther2 && insideOther) || (nearOther && isShorter) {
+				continue Outer
+			}
+		}
+		//pt1 := image.Pt(int(matLines.GetVeciAt(i, 0)[0]), int(matLines.GetVeciAt(i, 0)[1]))
+		//pt2 := image.Pt(int(matLines.GetVeciAt(i, 0)[2]), int(matLines.GetVeciAt(i, 0)[3]))
+		gocv.Line(&dst, pts[0], pts[1], color.RGBA{R: 255, G: 255, B: 255}, 1)
 	}
 
 	_ = sample.mat.Close()

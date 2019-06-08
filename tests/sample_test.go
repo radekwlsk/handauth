@@ -16,6 +16,7 @@ const (
 )
 
 func BenchmarkPreprocessZhang(b *testing.B) {
+	b.SkipNow()
 	resFlag := int(cmd.GPDSResources)
 	flags.Resources = &resFlag
 	testSamples := make([]*samples.Sample, 10)
