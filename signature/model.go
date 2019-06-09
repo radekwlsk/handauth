@@ -27,12 +27,12 @@ type UserModel struct {
 }
 
 type Model struct {
+	rows       uint16
+	cols       uint16
 	basic      features.FeatureMap
 	grid       GridFeatureMap
 	row        RowFeatureMap
 	col        ColFeatureMap
-	rows       uint16
-	cols       uint16
 	gridConfig samples.GridConfig
 }
 
@@ -106,7 +106,7 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 				features.LengthFeatureType:   features.NewLengthFeature(),
 				features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
-				features.CornersFeatureType:  features.NewCornersFeature(),
+				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
