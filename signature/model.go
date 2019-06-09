@@ -116,8 +116,9 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 			row[r] = features.FeatureMap{
 				features.LengthFeatureType: features.NewLengthFeature(),
 				//features.HOGFeatureType:      features.NewHOGFeature(),
-				features.GradientFeatureType: features.NewGradientFeature(),
-				features.CornersFeatureType:  features.NewCornersFeature(),
+				features.GradientFeatureType:    features.NewGradientFeature(),
+				features.MassCenterXFeatureType: features.NewMassCenterFeature(features.XMassCenter),
+				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -127,8 +128,9 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 			col[c] = features.FeatureMap{
 				features.LengthFeatureType: features.NewLengthFeature(),
 				//features.HOGFeatureType:      features.NewHOGFeature(),
-				features.GradientFeatureType: features.NewGradientFeature(),
-				features.CornersFeatureType:  features.NewCornersFeature(),
+				features.GradientFeatureType:    features.NewGradientFeature(),
+				features.MassCenterYFeatureType: features.NewMassCenterFeature(features.YMassCenter),
+				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -375,15 +377,20 @@ func (model *Model) AreaFilter(fieldThreshold float64, rowColThreshold float64) 
 	return nil
 }
 
-func (model *Model) StdMeanFilter(threshold float64) error {
+func stdFilter(ftr *features.Feature, thr float64) bool {
+	r := ftr.Max() - ftr.Min()
+	return ftr.Std() > r*thr
+}
+
+func (model *Model) StdFilter(threshold float64) error {
 	if model.gridConfig == (samples.GridConfig{}) {
 		return fmt.Errorf("at least one sample has to be extracted before filtering")
 	}
 
 	for rc, ftrMap := range model.grid {
 		for ftrType, ftr := range ftrMap {
-			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(model.grid, rc)
+			if features.FeatureFlags[ftrType] && stdFilter(ftr, threshold) {
+				delete(model.grid[rc], ftrType)
 				break
 			}
 		}
@@ -391,8 +398,8 @@ func (model *Model) StdMeanFilter(threshold float64) error {
 
 	for r, ftrMap := range model.row {
 		for ftrType, ftr := range ftrMap {
-			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(model.row, r)
+			if features.FeatureFlags[ftrType] && stdFilter(ftr, threshold) {
+				delete(model.row[r], ftrType)
 				break
 			}
 		}
@@ -400,11 +407,38 @@ func (model *Model) StdMeanFilter(threshold float64) error {
 
 	for c, ftrMap := range model.col {
 		for ftrType, ftr := range ftrMap {
-			if features.FeatureFlags[ftrType] && ftr.Std() > ftr.Value()*threshold {
-				delete(model.col, c)
+			if features.FeatureFlags[ftrType] && stdFilter(ftr, threshold) {
+				delete(model.col[c], ftrType)
 				break
 			}
 		}
 	}
 	return nil
+}
+
+func (model *Model) FeaturesCount() (size uint64) {
+
+	for range model.basic {
+		size += 1
+	}
+
+	for _, ftrMap := range model.grid {
+		for range ftrMap {
+			size += 1
+		}
+	}
+
+	for _, ftrMap := range model.row {
+		for range ftrMap {
+			size += 1
+		}
+	}
+
+	for _, ftrMap := range model.col {
+		for range ftrMap {
+			size += 1
+		}
+	}
+
+	return size
 }
