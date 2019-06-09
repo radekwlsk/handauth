@@ -133,8 +133,8 @@ func EnrollUser(id uint16, samplesIds []int, rows, cols uint16) signature.UserMo
 	if !*flags.AreaFilterOff {
 		_ = template.AreaFilter(*flags.AreaFilterFieldThreshold, *flags.AreaFilterRowColThreshold)
 	}
-	if !*flags.StdMeanFilterOff {
-		_ = template.StdMeanFilter(*flags.StdMeanFilterThreshold)
+	if !*flags.StdFilterOff {
+		_ = template.StdFilter(*flags.StdFilterThreshold)
 	}
 	return signature.UserModel{
 		Id:    id,

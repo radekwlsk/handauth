@@ -65,8 +65,8 @@ func configRecords() [][]string {
 		{"using area filter", fmt.Sprintf("%v", !*flags.AreaFilterOff)},
 		{"field area min threshold", fmt.Sprintf("%.3f", *flags.AreaFilterFieldThreshold)},
 		{"row/col area min threshold", fmt.Sprintf("%.3f", *flags.AreaFilterRowColThreshold)},
-		{"using std-mean filter", fmt.Sprintf("%v", !*flags.StdMeanFilterOff)},
-		{"std-mean max mean ratio threshold", fmt.Sprintf("%.3f", *flags.StdMeanFilterThreshold)},
+		{"using std-mean filter", fmt.Sprintf("%v", !*flags.StdFilterOff)},
+		{"std-mean max mean ratio threshold", fmt.Sprintf("%.3f", *flags.StdFilterThreshold)},
 	}
 	for a, w := range thresholdWeights {
 		config = append(config, []string{fmt.Sprintf("%s weight", a), fmt.Sprintf("%.2f", w)})

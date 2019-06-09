@@ -10,16 +10,16 @@ import (
 const (
 	ColsDefault                      = 60
 	RowsDefault                      = 20
-	MinThresholdDefault              = 1.0
-	MaxThresholdDefault              = 3.0
-	ThresholdStepDefault             = 0.05
+	MinThresholdDefault              = 0.0
+	MaxThresholdDefault              = 5.0
+	ThresholdStepDefault             = 0.02
 	BasicThresholdScaleDefault       = 1.0
 	GridThresholdScaleDefault        = 1.0
 	RowThresholdScaleDefault         = 1.0
 	ColThresholdScaleDefault         = 1.0
 	AreaFilterFieldThresholdDefault  = 0.03
 	AreaFilterRowColThresholdDefault = 0.02
-	StdMeanFilterThresholdDefault    = 1.0
+	StdFilterThresholdDefault        = 0.5
 )
 
 var (
@@ -45,8 +45,8 @@ var (
 		"area filter field min threshold")
 	AreaFilterRowColThreshold = flag.Float64("area-filter-rowcol", AreaFilterRowColThresholdDefault,
 		"area filter row/col min threshold")
-	StdMeanFilterOff       = flag.Bool("no-std-filter", false, "turn std-mean filter off")
-	StdMeanFilterThreshold = flag.Float64("std-filter", StdMeanFilterThresholdDefault,
+	StdFilterOff       = flag.Bool("no-std-filter", false, "turn std-mean filter off")
+	StdFilterThreshold = flag.Float64("std-filter", StdFilterThresholdDefault,
 		"std-mean filter max threshold")
 )
 

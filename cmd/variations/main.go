@@ -206,7 +206,7 @@ func main() {
 	flag.BoolVar(&addTimestamp, "time", false, "add test time to filenames")
 	flag.Parse()
 	flags.AreaFilterOff = newTrue()
-	flags.StdMeanFilterOff = newTrue()
+	flags.StdFilterOff = newTrue()
 
 	start = time.Now()
 	if addTimestamp {
