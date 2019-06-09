@@ -27,13 +27,15 @@ type UserModel struct {
 }
 
 type Model struct {
-	rows       uint16
-	cols       uint16
-	basic      features.FeatureMap
-	grid       GridFeatureMap
-	row        RowFeatureMap
-	col        ColFeatureMap
-	gridConfig samples.GridConfig
+	rows      uint16
+	cols      uint16
+	basic     features.FeatureMap
+	grid      GridFeatureMap
+	row       RowFeatureMap
+	col       ColFeatureMap
+	fieldArea float64
+	rowArea   float64
+	colArea   float64
 }
 
 func (model *Model) Basic() features.FeatureMap {
@@ -302,7 +304,16 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 	var sampleGrid *samples.SampleGrid
 	if AreaFlags[GridAreaType] || AreaFlags[RowAreaType] || AreaFlags[ColAreaType] {
 		sampleGrid = samples.NewSampleGrid(sample, model.rows, model.cols)
-		model.gridConfig = sampleGrid.Config()
+
+		{
+			w := []float64{float64(nSamples - 1), 1}
+			fa := sampleGrid.Config().FieldArea()
+			ra := sampleGrid.Config().RowArea()
+			ca := sampleGrid.Config().ColArea()
+			model.fieldArea = stat.Mean([]float64{model.fieldArea, fa}, w)
+			model.rowArea = stat.Mean([]float64{model.rowArea, ra}, w)
+			model.colArea = stat.Mean([]float64{model.colArea, ca}, w)
+		}
 
 		if AreaFlags[GridAreaType] {
 			for rc, ftrMap := range model.grid {
@@ -343,16 +354,16 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 }
 
 func (model *Model) AreaFilter(fieldThreshold float64, rowColThreshold float64) error {
-	if model.gridConfig == (samples.GridConfig{}) {
+	if model.fieldArea == 0.0 {
 		return fmt.Errorf("at least one sample has to be extracted before filtering")
 	}
 	if !features.FeatureFlags[features.LengthFeatureType] {
 		return nil
 	}
 
-	fieldAreaLimit := model.gridConfig.FieldArea() * fieldThreshold
-	rowAreaLimit := model.gridConfig.RowArea() * rowColThreshold
-	colAreaLimit := model.gridConfig.ColArea() * rowColThreshold
+	fieldAreaLimit := model.fieldArea * fieldThreshold
+	rowAreaLimit := model.rowArea * rowColThreshold
+	colAreaLimit := model.colArea * rowColThreshold
 
 	for rc, ftrMap := range model.grid {
 		lnFtr := ftrMap[features.LengthFeatureType]
@@ -383,7 +394,7 @@ func stdFilter(ftr *features.Feature, thr float64) bool {
 }
 
 func (model *Model) StdFilter(threshold float64) error {
-	if model.gridConfig == (samples.GridConfig{}) {
+	if model.fieldArea == 0.0 {
 		return fmt.Errorf("at least one sample has to be extracted before filtering")
 	}
 

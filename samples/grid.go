@@ -158,8 +158,8 @@ type SampleGrid struct {
 	mutex  sync.Mutex
 }
 
-func (sg *SampleGrid) Config() GridConfig {
-	return sg.config
+func (sg *SampleGrid) Config() *GridConfig {
+	return &sg.config
 }
 
 func NewSampleGrid(sample *Sample, rows, cols uint16) *SampleGrid {
