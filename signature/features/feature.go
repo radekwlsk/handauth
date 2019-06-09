@@ -107,6 +107,14 @@ func (f *Feature) Std() float64 {
 	return f.std
 }
 
+func (f *Feature) Min() float64 {
+	return f.min
+}
+
+func (f *Feature) Max() float64 {
+	return f.max
+}
+
 func (f *Feature) Score(other *Feature) float64 {
 	return stat.StdScore(other.Value(), f.mean, f.std)
 }
