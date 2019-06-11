@@ -37,6 +37,7 @@ func (sg *SampleGrid) At(row, col int) *Sample {
 		width:  sg.config.fieldWidth,
 		ratio:  float64(region.Cols()) / float64(region.Rows()),
 	}
+	region.Close()
 	return s
 }
 
