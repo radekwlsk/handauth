@@ -303,6 +303,9 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 
 	var sampleGrid *samples.SampleGrid
 	if AreaFlags[GridAreaType] || AreaFlags[RowAreaType] || AreaFlags[ColAreaType] {
+		if sample.Height() < int(model.rows) * 2 {
+			sample.Enlarge(0, int(model.rows) * 2, nil)
+		}
 		sampleGrid = samples.NewSampleGrid(sample, model.rows, model.cols)
 
 		{

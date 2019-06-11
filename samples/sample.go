@@ -266,6 +266,39 @@ func (sample *Sample) Resize(width int, ratio float64) {
 	sample.mat = dst
 }
 
+
+func (sample *Sample) Enlarge(width int, height int, c *color.RGBA) {
+	defer sample.Update()
+	dst := gocv.NewMat()
+	
+	ml := 0
+	mr := 0
+	mt := 0
+	mb := 0
+	if hgt := height - sample.Height(); hgt > 0 {
+		h := int(math.Floor(float64(hgt) / 2))
+		r := hgt - (2*h)
+		mt = h
+		mb = h + r
+	}
+	if wdt := width - sample.Width(); wdt > 0 {
+		w := int(math.Floor(float64(wdt) / 2))
+		r := wdt - (2*w)
+		ml = w
+		mr = w + r
+	}
+	
+	if c == nil {
+		c = &color.RGBA{A: 255}
+	}
+	
+	gocv.CopyMakeBorder(sample.mat, &dst, mt, mb, ml, mr, gocv.BorderConstant, *c)
+	
+	_ = sample.mat.Close()
+	sample.mat = dst
+}
+
+
 func (sample *Sample) CenterOfMass() image.Point {
 	m := gocv.Moments(sample.mat, true)
 	x := int(math.Round(m["m10"] / m["m00"]))
