@@ -11,7 +11,7 @@ const (
 	ColsDefault                      = 60
 	RowsDefault                      = 20
 	MinThresholdDefault              = 0.5
-	MaxThresholdDefault              = 5.5
+	MaxThresholdDefault              = 6.0
 	ThresholdStepDefault             = 0.02
 	BasicThresholdScaleDefault       = 1.0
 	GridThresholdScaleDefault        = 1.0

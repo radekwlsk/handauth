@@ -13,7 +13,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,6 +34,8 @@ var (
 	configWriter     *csv.Writer
 	workingDir       string
 	testMessage      string
+	genuineStats     cmd.VerificationStat
+	forgeriesStats   cmd.VerificationStat
 )
 
 func configRecords() [][]string {
@@ -93,6 +97,7 @@ func main() {
 
 	if flags.Verbose() {
 		log.Println("Starting")
+		PrintMemUsage()
 	}
 
 	{
@@ -128,6 +133,38 @@ func main() {
 		configWriter.Flush()
 	}
 
+	genuineStats = cmd.VerificationStat{
+		PositiveCounts: map[float64]uint16{},
+		NegativeCounts: map[float64]uint16{},
+	}
+	forgeriesStats = cmd.VerificationStat{
+		PositiveCounts: map[float64]uint16{},
+		NegativeCounts: map[float64]uint16{},
+	}
+
+	if *flags.Resources == int(cmd.GPDSResources) {
+		gpds()
+	} else {
+		others()
+	}
+
+	if flags.Verbose() {
+		log.Println("Finished, saving...")
+		PrintMemUsage()
+	}
+
+	_ = outWriter.Write([]string{"threshold", "frr", "far"})
+	for _, t := range thresholds {
+		_ = outWriter.Write([]string{
+			fmt.Sprintf("%.2f", t),
+			fmt.Sprintf("%.4f", genuineStats.RejectionRate(t)),
+			fmt.Sprintf("%.4f", forgeriesStats.AcceptanceRate(t)),
+		})
+	}
+	_ = configWriter.Write([]string{"total test duration", time.Since(start).String()})
+}
+
+func others() {
 	genuineSamplesUsers := cmd.GenuineUsers(fullResources)
 	forgerySamplesUsers := cmd.ForgeryUsers(fullResources)
 
@@ -161,10 +198,6 @@ func main() {
 	}
 
 	genuineResultsChan := make(chan *cmd.VerificationResult)
-	genuineStats := cmd.VerificationStat{
-		PositiveCounts: map[float64]uint16{},
-		NegativeCounts: map[float64]uint16{},
-	}
 
 	{
 		start := time.Now()
@@ -214,10 +247,6 @@ func main() {
 	}
 
 	forgeriesResultsChan := make(chan *cmd.VerificationResult)
-	forgeriesStats := cmd.VerificationStat{
-		PositiveCounts: map[float64]uint16{},
-		NegativeCounts: map[float64]uint16{},
-	}
 
 	{
 		start := time.Now()
@@ -273,13 +302,93 @@ func main() {
 			log.Printf("Verified all forgeries in %s\n", elapsed)
 		}
 	}
-	_ = outWriter.Write([]string{"threshold", "frr", "far"})
-	for _, t := range thresholds {
-		_ = outWriter.Write([]string{
-			fmt.Sprintf("%.2f", t),
-			fmt.Sprintf("%.4f", genuineStats.RejectionRate(t)),
-			fmt.Sprintf("%.4f", forgeriesStats.AcceptanceRate(t)),
-		})
+}
+
+func gpds() {
+	genuineStatsMutex := new(sync.Mutex)
+	forgeriesStatsMutex := new(sync.Mutex)
+
+	enrollSplit := int(math.Ceil(24 * split))
+	enrollSamples := make([]int, enrollSplit)
+	verifySamples := make([]int, 24-enrollSplit)
+	forgerySamples := make([]int, 30)
+	for i := range enrollSamples {
+		enrollSamples[i] = i + 1
 	}
-	_ = configWriter.Write([]string{"total test duration", time.Since(start).String()})
+	for i := range verifySamples {
+		verifySamples[i] = enrollSplit + i + 1
+	}
+	for i := range forgerySamples {
+		forgerySamples[i] = i + 1
+	}
+	wg := new(sync.WaitGroup)
+
+	for i := 1; i <= *flags.GPDSUsers; i++ {
+		userId := uint16(i)
+
+		um := cmd.EnrollUser(userId, enrollSamples, uint16(*flags.Rows), uint16(*flags.Cols))
+		wg.Add(1)
+		go func(id uint16, model *signature.UserModel) {
+			r := cmd.VerifyUser(id, verifySamples, model, thresholds, thresholdWeights)
+			genuineStatsMutex.Lock()
+			for i, t := range thresholds {
+				if r.SuccessCounts[i]+r.RejectedCounts[i] > 0 {
+					if _, ok := genuineStats.PositiveCounts[t]; ok {
+						genuineStats.PositiveCounts[t] += uint16(r.SuccessCounts[i])
+					} else {
+						genuineStats.PositiveCounts[t] = uint16(r.SuccessCounts[i])
+					}
+					if _, ok := genuineStats.NegativeCounts[t]; ok {
+						genuineStats.NegativeCounts[t] += uint16(r.RejectedCounts[i])
+					} else {
+						genuineStats.NegativeCounts[t] = uint16(r.RejectedCounts[i])
+					}
+				}
+			}
+			genuineStatsMutex.Unlock()
+			wg.Done()
+		}(userId, &um)
+
+		wg.Add(1)
+		go func(id uint16, model *signature.UserModel) {
+			r := cmd.VerifyUser(id, verifySamples, model, thresholds, thresholdWeights)
+			forgeriesStatsMutex.Lock()
+			for i, t := range thresholds {
+				if r.SuccessCounts[i]+r.RejectedCounts[i] > 0 {
+					if _, ok := forgeriesStats.PositiveCounts[t]; ok {
+						forgeriesStats.PositiveCounts[t] += uint16(r.SuccessCounts[i])
+					} else {
+						forgeriesStats.PositiveCounts[t] = uint16(r.SuccessCounts[i])
+					}
+					if _, ok := forgeriesStats.NegativeCounts[t]; ok {
+						forgeriesStats.NegativeCounts[t] += uint16(r.RejectedCounts[i])
+					} else {
+						forgeriesStats.NegativeCounts[t] = uint16(r.RejectedCounts[i])
+					}
+				}
+			}
+			forgeriesStatsMutex.Unlock()
+			wg.Done()
+		}(userId-1, &um)
+
+		runtime.GC()
+		if *flags.VVerbose {
+			log.Printf("Processed user %03d\n", userId)
+		}
+	}
+	wg.Wait()
+}
+
+func PrintMemUsage() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	log.Printf("\tAlloc = %v MiB", bToMb(m.Alloc))
+	log.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	log.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	log.Printf("\tNumGC = %v\n", m.NumGC)
+}
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
 }

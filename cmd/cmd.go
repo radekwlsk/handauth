@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const ResourcesSigCompPath = "/home/radoslaw/go/src/github.com/radekwlsk/handauth/res/sigcomp/"
@@ -112,18 +113,29 @@ func ReadUserSample(creator, user uint16, index uint8) (*samples.UserSample, err
 func EnrollUser(id uint16, samplesIds []int, rows, cols uint16) signature.UserModel {
 	template := signature.NewModel(rows, cols, nil)
 	ok := false
-	var sample *samples.UserSample
-	var err error
+	userSamples := make([]*samples.UserSample, len(samplesIds))
+	wg := new(sync.WaitGroup)
 	for i, s := range samplesIds {
-		sample, err = ReadUserSample(id, id, uint8(s))
+		sample, err := ReadUserSample(id, id, uint8(s))
 		if err != nil {
+			userSamples[i] = nil
 			continue
 		} else {
 			ok = true
+			userSamples[i] = sample
 		}
-		sample.Preprocess()
-		template.Extract(sample.Sample(), i+1)
-		sample.Close()
+		wg.Add(1)
+		go func(s *samples.UserSample) {
+			s.Preprocess()
+			wg.Done()
+		}(sample)
+	}
+	wg.Wait()
+	for i, sample := range userSamples {
+		if sample != nil {
+			template.Extract(sample.Sample(), i+1)
+			sample.Close()
+		}
 	}
 	if !ok {
 		return signature.UserModel{
