@@ -102,16 +102,17 @@ func main() {
 
 	{
 		workingDir, _ = os.Getwd()
-		if !strings.HasSuffix(outFileName, ".csv") {
-			outFileName += ".csv"
+		if !strings.HasSuffix(outFileName, ".dat") {
+			outFileName += ".dat"
 		}
-		file, err := os.Create(path.Join(workingDir, "res", startString+"_"+outFileName))
+		file, err := os.Create(path.Join(workingDir, "res", outFileName))
 		if err != nil {
 			panic(err)
 		}
 		defer file.Close()
 
 		outWriter = csv.NewWriter(file)
+		outWriter.Comma = '\t'
 		defer outWriter.Flush()
 	}
 
@@ -120,7 +121,7 @@ func main() {
 
 	{
 		ext := filepath.Ext(outFileName)
-		configFileName := startString + "_" + strings.TrimSuffix(outFileName, ext) + "_config" + ext
+		configFileName := strings.TrimSuffix(outFileName, ext) + "_config" + ".csv"
 		file, err := os.Create(path.Join(workingDir, "res", configFileName))
 		if err != nil {
 			panic(err)
@@ -153,7 +154,7 @@ func main() {
 		PrintMemUsage()
 	}
 
-	_ = outWriter.Write([]string{"threshold", "frr", "far"})
+	_ = outWriter.Write([]string{"threshold", "FRR", "FAR"})
 	for _, t := range thresholds {
 		_ = outWriter.Write([]string{
 			fmt.Sprintf("%.2f", t),
