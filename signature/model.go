@@ -93,9 +93,8 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 
 	if AreaFlags[BasicAreaType] {
 		basic = features.FeatureMap{
-			features.LengthFeatureType:   features.NewLengthFeature(),
-			features.GradientFeatureType: features.NewGradientFeature(),
-			//features.HOGFeatureType:      features.NewHOGFeature(),
+			features.LengthFeatureType:      features.NewLengthFeature(),
+			features.GradientFeatureType:    features.NewGradientFeature(),
 			features.AspectFeatureType:      features.NewAspectFeature(),
 			features.MassCenterXFeatureType: features.NewMassCenterFeature(features.XMassCenter),
 			features.MassCenterYFeatureType: features.NewMassCenterFeature(features.YMassCenter),
@@ -108,7 +107,6 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 				features.LengthFeatureType:   features.NewLengthFeature(),
 				features.HOGFeatureType:      features.NewHOGFeature(),
 				features.GradientFeatureType: features.NewGradientFeature(),
-				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -116,11 +114,9 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 		row = make(RowFeatureMap)
 		for _, r := range rowKeys {
 			row[r] = features.FeatureMap{
-				features.LengthFeatureType: features.NewLengthFeature(),
-				//features.HOGFeatureType:      features.NewHOGFeature(),
+				features.LengthFeatureType:      features.NewLengthFeature(),
 				features.GradientFeatureType:    features.NewGradientFeature(),
 				features.MassCenterXFeatureType: features.NewMassCenterFeature(features.XMassCenter),
-				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -128,11 +124,9 @@ func newModel(rows, cols uint16, rowKeys, colKeys []int, gridKeys [][2]int) *Mod
 		col = make(ColFeatureMap)
 		for _, c := range colKeys {
 			col[c] = features.FeatureMap{
-				features.LengthFeatureType: features.NewLengthFeature(),
-				//features.HOGFeatureType:      features.NewHOGFeature(),
+				features.LengthFeatureType:      features.NewLengthFeature(),
 				features.GradientFeatureType:    features.NewGradientFeature(),
 				features.MassCenterYFeatureType: features.NewMassCenterFeature(features.YMassCenter),
-				//features.CornersFeatureType:  features.NewCornersFeature(),
 			}
 		}
 	}
@@ -303,8 +297,8 @@ func (model *Model) Extract(sample *samples.Sample, nSamples int) {
 
 	var sampleGrid *samples.SampleGrid
 	if AreaFlags[GridAreaType] || AreaFlags[RowAreaType] || AreaFlags[ColAreaType] {
-		if sample.Height() < int(model.rows) * 2 {
-			sample.Enlarge(0, int(model.rows) * 2, nil)
+		if sample.Height() < int(model.rows)*2 {
+			sample.Enlarge(0, int(model.rows)*2, nil)
 		}
 		sampleGrid = samples.NewSampleGrid(sample, model.rows, model.cols)
 
