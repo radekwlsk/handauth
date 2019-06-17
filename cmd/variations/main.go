@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/csv"
 	"flag"
 	"fmt"
 	"github.com/radekwlsk/handauth/cmd"
@@ -16,6 +17,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"strconv"
 	"time"
 )
 
@@ -138,7 +140,6 @@ func variationBetweenUsers() map[features.FeatureType]*mat.Dense {
 		features.LengthFeatureType:   mat.NewDense(*flags.Rows, *flags.Cols, nil),
 		features.GradientFeatureType: mat.NewDense(*flags.Rows, *flags.Cols, nil),
 		features.HOGFeatureType:      mat.NewDense(*flags.Rows, *flags.Cols, nil),
-		features.CornersFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
 	}
 
 	var models []*signature.UserModel
@@ -183,7 +184,8 @@ func variationWithinUser(id int) map[features.FeatureType]*mat.Dense {
 		features.LengthFeatureType:   mat.NewDense(*flags.Rows, *flags.Cols, nil),
 		features.GradientFeatureType: mat.NewDense(*flags.Rows, *flags.Cols, nil),
 		features.HOGFeatureType:      mat.NewDense(*flags.Rows, *flags.Cols, nil),
-		features.CornersFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
+		//features.MassCenterXFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
+		//features.MassCenterYFeatureType:  mat.NewDense(*flags.Rows, *flags.Cols, nil),
 	}
 
 	userModel := cmd.EnrollUser(uint16(id), samplesUsers[id], uint16(*flags.Rows), uint16(*flags.Cols))
@@ -265,14 +267,34 @@ func main() {
 				log.Println(fmt.Sprintf("empty matrix %s of values %f", ft, mat.Min(hm)))
 				continue
 			}
-			plt, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Between Users", ft))
+			filename := ft.String() + "_grid_" + strconv.Itoa(*flags.Resources) + ".dat"
+			workingDir, _ := os.Getwd()
+			file, err := os.Create(path.Join(workingDir, "res", filename))
 			if err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
-			filename := startString + ft.String() + ".png"
-			if err = plt.Save(720, 480, path.Join("res", filename)); err != nil {
-				log.Fatal(err)
+
+			outWriter := csv.NewWriter(file)
+			outWriter.Comma = '\t'
+			_ = outWriter.Write([]string{"row", "col", "var"})
+			rows, cols := hm.Dims()
+			for r := 0; r < rows; r++ {
+				for c := 0; c < cols; c++ {
+					_ = outWriter.Write([]string{fmt.Sprint(r), fmt.Sprint(c), fmt.Sprint(hm.At(r, c))})
+				}
 			}
+
+			outWriter.Flush()
+			file.Close()
+
+			//plt, err := plotHeatmap(hm, fmt.Sprintf("%s Variation Between Users", ft))
+			//if err != nil {
+			//	log.Fatal(err)
+			//}
+			//filename := startString + ft.String() + ".png"
+			//if err = plt.Save(720, 480, path.Join("res", filename)); err != nil {
+			//	log.Fatal(err)
+			//}
 		}
 	}
 }
