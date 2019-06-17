@@ -20,26 +20,39 @@ func histogramOfGradients(sample *samples.Sample) float64 {
 	}
 	sobelX := gocv.NewMat()
 	sobelY := gocv.NewMat()
-	defer sobelX.Close()
-	defer sobelY.Close()
 	gocv.Sobel(sample.Mat(), &sobelX, gocv.MatTypeCV32F,
 		1, 0, 3, 1.0, 0.0, gocv.BorderReplicate)
 	gocv.Sobel(sample.Mat(), &sobelY, gocv.MatTypeCV32F,
 		0, 1, 3, 1.0, 0.0, gocv.BorderReplicate)
-	magnitude := gocv.NewMat()
-	angle := gocv.NewMat()
-	defer magnitude.Close()
-	defer angle.Close()
-	gocv.CartToPolar(sobelX, sobelY, &magnitude, &angle, true)
+	mgMat := gocv.NewMat()
+	agMat := gocv.NewMat()
+	gocv.CartToPolar(sobelX, sobelY, &mgMat, &agMat, true)
+	sobelX.Close()
+	sobelY.Close()
+	magnitude, err := mgMat.DataPtrFloat32()
+	if err != nil {
+		panic(err)
+	}
+	angle, err := agMat.DataPtrFloat32()
+	if err != nil {
+		panic(err)
+	}
+	rows := agMat.Rows()
+	cols := agMat.Cols()
+	mgMat.Close()
+	agMat.Close()
 	bins := make(map[int]float64)
-	for r := 0; r < angle.Rows(); r++ {
-		for c := 0; c < angle.Cols(); c++ {
-			a := math.Mod(float64(angle.GetFloatAt(r, c)), 180.0)
-			if a < 0 {
-				a = a + 180.0
+	for r := 0; r < rows; r++ {
+		for c := 0; c < cols; c++ {
+			m := magnitude[r*(cols)+c]
+			if m != 0 {
+				a := math.Mod(float64(angle[r*(cols)+c]), 180.0)
+				if a < 0 {
+					a = a + 180.0
+				}
+				b := int(math.Floor(a / 2.0))
+				bins[b] = bins[b] + float64(m)
 			}
-			b := int(math.Floor(a / 2.0))
-			bins[b] = bins[b] + float64(magnitude.GetFloatAt(r, c))
 		}
 	}
 	var total float64
